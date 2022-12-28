@@ -54,6 +54,7 @@ import moveit_msgs.msg
 import geometry_msgs.msg
 from sensor_msgs.msg import JointState
 import numpy as np
+from geometry_msgs.msg import Quaternion
 
 try:
     from math import pi, tau, dist, fabs, cos
@@ -70,31 +71,14 @@ from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
 
 
-
-
-#from trajectory_msgs.msg import JointTrajectory
-#from trajectory_msgs.msg import JointTrajectoryPoint
-#from moveit_msgs.msg import RobotTrajectory
-
-#from std_msgs.msg import Float64MultiArray
-#from std_msgs.msg import Time
-#from std_msgs.msg import Header
-#from std_msgs.msg import Duration
-
 moveit_commander.roscpp_initialize(sys.argv)
 rospy.init_node("move_group_python_interface_tutorial", anonymous=True)
+
 
 pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
 joint_command_isaac = JointState()
 
-
-#pub = rospy.Publisher("/joint_command", RobotTrajectory, queue_size=20)
-#joint_command_isaac = JointTrajectory()
-#joint_command_isaac = RobotTrajectory()
-#joint_command_isaac.header = Header()
-#joint_command_isaac.header.stamp = rospy.Time.now()
-
-
+'''
 joint_command_isaac.name = [
 "panda_joint1",
 "panda_joint2",
@@ -106,6 +90,8 @@ joint_command_isaac.name = [
 "panda_finger_joint1",
 "panda_finger_joint2",
 ]
+'''
+
 
 
 positions = []
@@ -172,6 +158,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## arm planning group.
         ## This interface can be used to plan and execute motions:
         #group_name = "panda_arm"
+        #group_name = "panda_arm"
         group_name = "panda_manipulator"
         move_group = moveit_commander.MoveGroupCommander(group_name)
 
@@ -203,11 +190,11 @@ class MoveGroupPythonInterfaceTutorial(object):
         group_names = robot.get_group_names()
         print("============ Available Planning Groups:", robot.get_group_names())
 
-        # Sometimes for debugging it is useful to print the entire state of the
-        # robot:
-        print("============ Printing robot state")
-        print(robot.get_current_state())
-        print("")
+        ## Sometimes for debugging it is useful to print the entire state of the
+        ## robot:
+        #print("============ Printing robot state")
+        #print(robot.get_current_state())
+        #print("")
         ## END_SUB_TUTORIAL
 
         # Misc variables
@@ -235,6 +222,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## We use the constant `tau = 2*pi <https://en.wikipedia.org/wiki/Turn_(angle)#Tau_proposals>`_ for convenience:
         # We get the joint values from the group and change some of the values:
         joint_goal = move_group.get_current_joint_values()
+
         joint_goal[0] = 0
         joint_goal[1] = -tau / 8
         joint_goal[2] = 0
@@ -265,12 +253,15 @@ class MoveGroupPythonInterfaceTutorial(object):
         joint_command_isaac.position = new_arr_pos    
         pub.publish(joint_command_isaac)
 
+        print(self.move_group.get_current_pose().pose)
+
+
 
     
         return all_close(joint_goal, current_joints, 0.01)
 
 
-    def go_to_pose_goal(self, w, x, y, z):
+    def go_to_pose_goal(self, x, y, z):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
         # reason not to.
@@ -282,19 +273,31 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## ^^^^^^^^^^^^^^^^^^^^^^^
         ## We can plan a motion for this group to a desired pose for the
         ## end-effector:
-        
+  
         pose_goal = geometry_msgs.msg.Pose()
-        pose_goal.orientation.w = w
+
         pose_goal.position.x = x
         pose_goal.position.y = y
         pose_goal.position.z = z
+        
+        pose_goal.orientation.x = 0
+        pose_goal.orientation.y = 1
+        pose_goal.orientation.z = 0
+        pose_goal.orientation.w = 0
 
-        move_group.set_planning_time(10)
+        # X, Y, Z, W
+        #quat_tf = [0, 1, 0, 0]
+        #xyz = [x, y, z]
+        #print(quat_tf)
+
+        move_group.set_planning_time(5)
         move_group.set_max_velocity_scaling_factor(1.0)
         move_group.set_max_acceleration_scaling_factor(1.0)
+
+        #move_group.set_orientation_target(quat_tf, end_effector_link = "panda_hand")
+        move_group.set_pose_target(pose_goal, end_effector_link = "panda_hand")
         
-        #move_group.set_pose_target(pose_goal, end_effector_link = "panda_hand")
-        move_group.set_pose_target(pose_goal)
+
 
 
         ## Now, we call the planner to compute the plan and execute it.
@@ -313,6 +316,10 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## Note that since this section of code will not be included in the tutorials
         ## we use the class variable rather than the copied state variable
         current_pose = self.move_group.get_current_pose().pose
+
+        #print(self.move_group.get_current_pose().pose)
+
+
 
         return all_close(pose_goal, current_pose, 0.01)
 
@@ -524,6 +531,38 @@ class MoveGroupPythonInterfaceTutorial(object):
         return False
 
 
+    def add_table(self, timeout=4):
+            # Copy class variables to local variables to make the web tutorials more clear.
+            # In practice, you should use the class variables directly unless you have a good
+            # reason not to.
+            box_name = self.box_name
+            scene = self.scene
+
+            ## BEGIN_SUB_TUTORIAL add_box
+            ##
+            ## Adding Objects to the Planning Scene
+            ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            ## First, we will create a box in the planning scene between the fingers:
+            box_pose = geometry_msgs.msg.PoseStamped()
+            box_pose.header.frame_id = "panda_link0"
+
+
+            box_pose.pose.position.x = 0.5
+            box_pose.pose.position.y = 0
+            box_pose.pose.position.z = 0.025
+
+
+            box_name = "table"
+            scene.add_box(box_name, box_pose, size = (0.5, 0.5, 0.15))
+
+
+            ## END_SUB_TUTORIAL
+            # Copy local variables back to class variables. In practice, you should use the class
+            # variables directly unless you have a good reason not to.
+            self.box_name = box_name
+            return self.wait_for_state_update(box_is_known=True, timeout=timeout), box_pose
+
+
     def add_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
@@ -537,17 +576,39 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         ## First, we will create a box in the planning scene between the fingers:
         box_pose = geometry_msgs.msg.PoseStamped()
-        box_pose.header.frame_id = "panda_hand"
-        box_pose.pose.orientation.w = 1.0
-        box_pose.pose.position.z = 0.11  # above the panda_hand frame
-        box_name = "box"
-        scene.add_box(box_name, box_pose, size=(0.075, 0.075, 0.075))
+        box_pose.header.frame_id = "panda_link0"
+
+        #box_pose.pose.orientation.x = 0.0
+        #box_pose.pose.orientation.y = 1.0
+        #box_pose.pose.orientation.z = 0.0
+        #box_pose.pose.orientation.w = 0.0
+
+
+        box_pose.pose.position.x = 0.4
+        box_pose.pose.position.y = 0
+        box_pose.pose.position.z = 0.125
+
+
+        box_name = "Cube"
+        scene.add_box(box_name, box_pose, size = (0.05, 0.05, 0.05))
+
 
         ## END_SUB_TUTORIAL
         # Copy local variables back to class variables. In practice, you should use the class
         # variables directly unless you have a good reason not to.
         self.box_name = box_name
-        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+        return self.wait_for_state_update(box_is_known=True, timeout=timeout), box_pose
+
+    def pick_box(self):
+        current_joints = self.move_group.get_current_joint_values()
+
+        new_arr_pos = np.concatenate( (current_joints, [0.1, 0.1] ) )
+        joint_command_isaac.position = new_arr_pos    
+        pub.publish(joint_command_isaac)
+
+        print("Ola mestre")
+        print(new_arr_pos)
+
 
 
     def attach_box(self, timeout=4):
@@ -634,11 +695,14 @@ def main():
         print("----------------------------------------------------------")
         print("Press Ctrl-D to exit at any time")
         print("")
+
+       
         
         #input(
         #    "============ Press `Enter` to begin the tutorial by setting up the moveit_commander ..."
         #)
         tutorial = MoveGroupPythonInterfaceTutorial()
+        tutorial.add_table()
 
         input("============ Press `Enter` to execute a movement using a joint state goal ...")
         tutorial.go_to_joint_state()
@@ -662,12 +726,12 @@ def main():
         input("============ Press `Enter` to execute a movement using a pose goal 1 ...")
         start = time.time()
 
-                                    # w, x, y, z
-        tutorial.go_to_pose_goal(0.0, 0.2, 0.2, 0.8)
-        tutorial.go_to_pose_goal(-1.0, 0.2, 0.5, 0.7)
+                                    # x, y, z
+        tutorial.go_to_pose_goal(-0.2, 0.2, 0.8)
+        tutorial.go_to_pose_goal(0.4, 0.0, 0.4)
 
-        tutorial.go_to_pose_goal(-1.0, 0.2, -0.4, 0.7)
-        tutorial.go_to_pose_goal(-1.0, -0.4, -0.4, 0.9)
+
+        #tutorial.go_to_pose_goal(-1.0, -0.4, -0.4, 0.9)
 
         print("time: ")
         end = time.time()
@@ -675,7 +739,11 @@ def main():
 
 
         #input("============ Press `Enter` to add a box to the planning scene ...")
-        #tutorial.add_box()
+        #tutorial.detach_box()
+        #tutorial.remove_box()
+        a, box = tutorial.add_box()
+        tutorial.go_to_pose_goal(0.4, 0.0, 0.22)
+        tutorial.pick_box()
 
         #input("============ Press `Enter` to attach a Box to the Panda robot ...")
         #tutorial.attach_box()
