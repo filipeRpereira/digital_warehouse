@@ -63,6 +63,8 @@ from moveit_msgs.msg import MoveItErrorCodes
 import numpy as np
 from geometry_msgs.msg import Quaternion
 
+import ros_tools
+
 try:
     from math import pi, tau, dist, fabs, cos
 except:  # For Python 2 compatibility
@@ -85,9 +87,9 @@ from moveit_commander.conversions import pose_to_list
 
 
 moveit_commander.roscpp_initialize(sys.argv)
-rospy.init_node("move_group_python_interface_tutorial", anonymous=True)
+rospy.init_node("move_group_python_interface_tutorial", anonymous=False)
 
-pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
+#pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
 joint_command_isaac = JointState()
 
 pub_gripper = rospy.Publisher("/gripper_command", Grasp,queue_size=20)
@@ -226,9 +228,9 @@ class MoveGroupPythonInterfaceTutorial(object):
         ## For testing:
         current_joints = move_group.get_current_joint_values()
 
-        new_arr_pos = np.concatenate( (current_joints, [0.2, 0.2] ) )
-        joint_command_isaac.position = new_arr_pos    
-        pub.publish(joint_command_isaac)
+        #new_arr_pos = np.concatenate( (current_joints, [0.2, 0.2] ) )
+        #joint_command_isaac.position = new_arr_pos    
+        #pub.publish(joint_command_isaac)
 
         print(self.move_group.get_current_pose().pose)
 
@@ -613,7 +615,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         rospy.sleep(1)
         rospy.logwarn("moving to test")
         grasps = [] 
-        0.67611; 0.0091003; 0.71731
+        #0.67611; 0.0091003; 0.71731
         g = Grasp()
         g.id = "test"
         
@@ -639,8 +641,8 @@ class MoveGroupPythonInterfaceTutorial(object):
 
         # define the pre-grasp approach
         g.pre_grasp_approach.direction.header.frame_id = "panda_link0"
-        g.pre_grasp_approach.direction.vector.x = box.pose.position.x
-        g.pre_grasp_approach.direction.vector.y = box.pose.position.y + 0.2
+        g.pre_grasp_approach.direction.vector.x = box.pose.position.x #- 2.0
+        g.pre_grasp_approach.direction.vector.y = box.pose.position.y + 0.4
         g.pre_grasp_approach.direction.vector.z = -box.pose.position.z - 0.2
         g.pre_grasp_approach.min_distance = 0.1
         g.pre_grasp_approach.desired_distance = 0.3
@@ -661,8 +663,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         pos.effort.append(0.9)
     
         g.grasp_posture.points.append(pos)
-
-        
+    
         # set the post-grasp retreat
         g.post_grasp_retreat.direction.header.frame_id = "panda_link0"
         g.post_grasp_retreat.direction.vector.x = -0.4
@@ -674,20 +675,124 @@ class MoveGroupPythonInterfaceTutorial(object):
         #g.allowed_touch_objects = ["table", "panda_hand", "Cube"]
         g.allowed_touch_objects = ["table"]
         
-
-        g.max_contact_force = 0.5
+        g.max_contact_force = 0.0
+        g.grasp_quality = 0.1     
         
         # append the grasp to the list of grasps
         grasps.append(g)
-        
-    
         
         # pick the object
         #move_group.pick("Cube", grasps)
         result = False
         n_attempts = 0
+           
+        ## repeat until will succeed
+        while result == False:
+            print("Attempts pickup: "), n_attempts
+            result = move_group.pick("Cube", grasps)      
+            n_attempts += 1
+            rospy.sleep(1)
+        rospy.loginfo("Pickup successful")
+
+        placement_pose = PoseStamped()
+        placement_pose.header.frame_id = "panda_link0"
+        placement_pose.pose.position.x = -0.5
+        placement_pose.pose.position.y = 0.0
+        placement_pose.pose.position.z = 0.2
+
+        placement_pose.pose.orientation.x = 0.0
+        placement_pose.pose.orientation.y = 0
+        placement_pose.pose.orientation.z = 1.
+        placement_pose.pose.orientation.w = 0
+
+        result1 = False
+        n_attempts1 = 0
+        while result1 == False:
+            print("Attempts place: "), n_attempts1
+            result1 = move_group.place("Cube", placement_pose)      
+            n_attempts1 += 1
+            rospy.sleep(0.2)
+        rospy.sleep(1)
+        rospy.loginfo("Placement successful")
+    
+
+    def pick_box_inverted(self, box):   
+        rospy.sleep(1)
+        rospy.logwarn("moving to test")
+        grasps = [] 
+        g = Grasp()
+        g.id = "test"
         
+        grasp_pose = PoseStamped()
+        grasp_pose.header.frame_id = "panda_link0"
+
+        grasp_pose.pose.position.x = -0.4
+        grasp_pose.pose.position.y = 0.0
+        grasp_pose.pose.position.z = 0.2
         
+        grasp_pose.pose.orientation.y = 1.0
+        grasp_pose.pose.orientation.z = 0
+        grasp_pose.pose.orientation.w = 0
+
+
+        rospy.logwarn("moving to arm")
+        move_group = self.move_group
+        
+        rospy.sleep(1)
+        
+        # set the grasp pose
+        g.grasp_pose = grasp_pose
+
+        # define the pre-grasp approach
+        g.pre_grasp_approach.direction.header.frame_id = "panda_link0"
+        #g.pre_grasp_approach.direction.vector.x = box.pose.position.x #- 2.0
+        #g.pre_grasp_approach.direction.vector.y = box.pose.position.y + 0.4
+        #g.pre_grasp_approach.direction.vector.z = -box.pose.position.z - 0.2
+        g.pre_grasp_approach.direction.vector.x = -0.5
+        g.pre_grasp_approach.direction.vector.y = 0.4
+        g.pre_grasp_approach.direction.vector.z = 0.235
+        g.pre_grasp_approach.min_distance = 0.1
+        g.pre_grasp_approach.desired_distance = 0.3
+        g.pre_grasp_posture.header.frame_id = "panda_link0"
+        g.pre_grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
+
+        pos = JointTrajectoryPoint()
+        pos.positions.append(0.06)
+
+        g.pre_grasp_posture.points.append(pos)
+
+        # set the grasp posture
+        g.grasp_posture.header.frame_id = "panda_link0"
+        g.grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
+
+        pos = JointTrajectoryPoint()
+        pos.positions.append(0.0)
+        pos.effort.append(0.9)
+
+        g.grasp_posture.points.append(pos)
+
+        # set the post-grasp retreat
+        g.post_grasp_retreat.direction.header.frame_id = "panda_link0"
+        g.post_grasp_retreat.direction.vector.x = -0.4
+        g.post_grasp_retreat.direction.vector.y = 0.2
+        g.post_grasp_retreat.direction.vector.z = 0.7
+        g.post_grasp_retreat.desired_distance = 0.25
+        g.post_grasp_retreat.min_distance = 0.01
+
+        #g.allowed_touch_objects = ["table", "panda_hand", "Cube"]
+        g.allowed_touch_objects = ["table"]
+        
+        g.max_contact_force = 0.0
+        g.grasp_quality = 0.1     
+        
+        # append the grasp to the list of grasps
+        grasps.append(g)
+        
+        # pick the object
+        #move_group.pick("Cube", grasps)
+        result = False
+        n_attempts = 0
+            
         ## repeat until will succeed
         while result == False:
             print("Attempts pickup: "), n_attempts
@@ -702,14 +807,11 @@ class MoveGroupPythonInterfaceTutorial(object):
         placement_pose.pose.position.y = 0.0
         placement_pose.pose.position.z = 0.125
 
-        placement_pose.pose.orientation.x = 0
+        placement_pose.pose.orientation.x = 0.0
         placement_pose.pose.orientation.y = 0
-        placement_pose.pose.orientation.z = 0
+        placement_pose.pose.orientation.z = 1.0
         placement_pose.pose.orientation.w = 0
 
-        #move_group.place("Cube", placement_pose)  
-
-        
         result1 = False
         n_attempts1 = 0
         while result1 == False:
@@ -719,8 +821,6 @@ class MoveGroupPythonInterfaceTutorial(object):
             rospy.sleep(0.2)
         rospy.sleep(1)
         rospy.loginfo("Placement successful")
-
-        #rospy.spin()
     
 
     def attach_box(self, timeout=4):
@@ -818,65 +918,52 @@ def main():
         tutorial.add_table()
         tutorial.add_table_placement()
 
-        input("============ Press `Enter` to execute a movement using a joint state goal ...")
-        tutorial.go_to_joint_state()
-        '''
-        input("============ Press `Enter` to execute a movement using a pose goal ...")
-        tutorial.go_to_pose_goal()
+        input("Press any key to continue...")
 
-
-        input("============ Press `Enter` to plan and display a Cartesian path ...")
-        cartesian_plan, fraction = tutorial.plan_cartesian_path()
-
-        input(
-            "============ Press `Enter` to display a saved trajectory (this will replay the Cartesian path)  ..."
-        )
-        tutorial.display_trajectory(cartesian_plan)
-
-        input("============ Press `Enter` to execute a saved path ...")
-        tutorial.execute_plan(cartesian_plan)
-        '''
-
-        input("============ Press `Enter` to execute a movement using a pose goal 1 ...")
         start = time.time()
-
+        tutorial.go_to_joint_state()
                                     # x, y, z
-        tutorial.go_to_pose_goal(-0.2, 0.2, 0.8)
-        tutorial.go_to_pose_goal(0.4, 0.0, 0.4)
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.22)
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.22)
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.22)
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.22)
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
 
 
-        #tutorial.go_to_pose_goal(-1.0, -0.4, -0.4, 0.9)
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
+
+
+        tutorial.go_to_joint_state()
 
         print("time: ")
         end = time.time()
         print(end - start)
+        
 
-
-        input("============ Press `Enter` to add a box to the planning scene ...")
-        #tutorial.detach_box()
-        #tutorial.remove_box()
-        a, box = tutorial.add_box()
-        #tutorial.go_to_pose_goal(0.4, 0.0, 0.22)
-        tutorial.pick_box(box)
-
-        #input("============ Press `Enter` to attach a Box to the Panda robot ...")
-        #tutorial.attach_box()
-
-        #input(
-        #    "============ Press `Enter` to plan and execute a path with an attached collision object ..."
-        #)
-        #cartesian_plan, fraction = tutorial.plan_cartesian_path(scale=-1)
-        #tutorial.execute_plan(cartesian_plan)
-
-        #input("============ Press `Enter` to detach the box from the Panda robot ...")
-        #tutorial.detach_box()
-
-        #input(
-        #    "============ Press `Enter` to remove the box from the planning scene ..."
-        #)
-        #tutorial.remove_box()
-
-        print("============ Python tutorial demo complete!")
     except rospy.ROSInterruptException:
         return
     except KeyboardInterrupt:
