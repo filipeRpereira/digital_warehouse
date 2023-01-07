@@ -3,6 +3,10 @@ import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState
 import re
+import matplotlib.pyplot as plt
+from matplotlib.collections import EventCollection
+
+
 
 data_file_joint_position = "/home/filipe/Desktop/Dissertação/data_position.txt"
 data_file_joint_velocity = "/home/filipe/Desktop/Dissertação/data_velocity.txt"
@@ -20,7 +24,6 @@ def callback(data):
     
     for i in range(len(home_position)):
         home_position[i] = home_position[i].replace('(','').replace(')','')
-    #print(home_position)
     
     home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -91,11 +94,87 @@ def read_joints_data_from_file(data_file):
     
     for i in range(1,len(result)-1):
         joints.append(result[i].split(','))
-        print(result[i])
+        #print(result[i])
         
     return joints
     
 
+def plot_results(joints_data, y_label):
+    joint_0 = []
+    joint_1 = []
+    joint_2 = []
+    joint_3 = []
+    joint_4 = []
+    joint_5 = []
+    joint_6 = []
+    joint_7 = []
+    joint_8 = []
+
+    for data in joints_data:
+        joint_0.append(float(data[0]))
+        joint_1.append(float(data[1]))
+        joint_2.append(float(data[2]))
+        joint_3.append(float(data[3]))
+        joint_4.append(float(data[4]))
+        joint_5.append(float(data[5]))
+        joint_6.append(float(data[6]))
+        joint_7.append(float(data[7]))
+        joint_8.append(float(data[8]))
+        
+    fig1, axs1 = plt.subplots(3)
+
+    axs1[0].plot(joint_0)
+    axs1[0].set_title('joint_0')
+    axs1[1].plot(joint_1)
+    axs1[1].set_title('joint_1')
+    axs1[2].plot(joint_2)
+    axs1[2].set_title('joint_2')
+    
+    fig2, axs2 = plt.subplots(3)
+    axs2[0].plot(joint_3)
+    axs2[0].set_title('joint_3')
+    axs2[1].plot(joint_4)
+    axs2[1].set_title('joint_4')
+    axs2[2].plot(joint_5)
+    axs2[2].set_title('joint_5')
+
+    fig3, axs3 = plt.subplots(3)
+    axs3[0].plot(joint_6)
+    axs3[0].set_title('joint_6')
+    axs3[1].plot(joint_7)
+    axs3[1].set_title('joint_7')
+    axs3[2].plot(joint_8)
+    axs3[2].set_title('joint_8')
+    
+    fig1.tight_layout()
+    fig2.tight_layout()
+    fig3.tight_layout()
+    
+
+    for ax in axs1.flat:
+        ax.set(xlabel='samples', ylabel=y_label)
+    for ax in axs2.flat:
+        ax.set(xlabel='samples', ylabel=y_label)
+    for ax in axs3.flat:
+        ax.set(xlabel='samples', ylabel=y_label)
+
+    # Hide x labels and tick labels for top plots and y ticks for right plots.
+    for ax in axs1.flat:
+        ax.label_outer()
+    for ax in axs2.flat:
+        ax.label_outer()
+    for ax in axs3.flat:
+        ax.label_outer()
+    plt.show()
+
 if __name__ == '__main__':
-    listener_new()
-    #joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
+    #listener_new()
+    joints_position = read_joints_data_from_file(data_file_joint_position)
+    joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
+    joints_effort = read_joints_data_from_file(data_file_joint_effort)
+
+    #plot_results(joints_position, "Position")
+    plot_results(joints_velocity, "Velocity")
+    #plot_results(joints_effort, "Effort")
+
+    
