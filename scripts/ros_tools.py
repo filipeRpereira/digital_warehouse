@@ -1,81 +1,117 @@
 #!/usr/bin/env python
 import rospy
 from std_msgs.msg import String
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import JointState, Imu
 import re
 import matplotlib.pyplot as plt
 from matplotlib.collections import EventCollection
-
-
+import message_filters
 
 data_file_joint_position = "/home/filipe/Desktop/Dissertação/data_position.txt"
 data_file_joint_velocity = "/home/filipe/Desktop/Dissertação/data_velocity.txt"
-data_file_joint_effort   = "/home/filipe/Desktop/Dissertação/data_effort.txt"
+data_file_joint_effort = "/home/filipe/Desktop/Dissertação/data_effort.txt"
 
-velocity_read = False 
+data_file_imu_link8_orientation = "/home/filipe/Desktop/Dissertação/imu_link8_orientation.txt"
+data_file_imu_link8_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link8_angular_velocity.txt"
+data_file_imu_link8_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link8_linear_acceleration.txt"
 
-def callback(data):
-    joint_position = data.position
-    joint_velocity = data.velocity
-    joint_effort = data.effort
+velocity_read = False
+robot_home_position = False
+
+
+def callback_check_home_position(joints, imu_link_8):
+    joint_position = joints.position
     # '0.0', ' -0.7853', ' -0.0001', ' -1.5715', ' 0.0', ' 1.0423', ' 0.0', ' 0.0347', ' 0.0353)']
 
     home_position = str(joint_position).split(',')
-    
+
     for i in range(len(home_position)):
-        home_position[i] = home_position[i].replace('(','').replace(')','')
-    
+        home_position[i] = home_position[i].replace('(', '').replace(')', '')
+
     home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     dif = [0, 0, 0, 0, 0, 0, 0, 0, 0]
-    
+
     for i in range(len(home_position)):
         dif_robot[i] = float(home_position[i])
 
-
     for i in range(len(dif_robot)):
         dif[i] = abs(dif_robot[i] - home_values[i])
-    
+
     home = True
     for i in range(len(dif)):
-        if dif[i] >0.01:
+        if dif[i] > 0.01:
             home = False
 
-    if home == False:
-        print("Home Position")
+    global robot_home_position
 
-        rospy.loginfo("Joint Position %s", joint_position)
-        rospy.loginfo("Joint Velocity %s", joint_velocity)
-        rospy.loginfo("Joint Effort %s", joint_effort)
-        
-        file_position = open(data_file_joint_position, "a")
-        file_position.write(str(joint_position))
-        file_position.close()
-
-        file_velocity = open(data_file_joint_velocity, "a")
-        file_velocity.write(str(joint_velocity))
-        file_velocity.close()
-
-        file_effort = open(data_file_joint_effort, "a")
-        file_effort.write(str(joint_effort))
-        file_effort.close()
-    
+    if not home:
+        print("Not Home Position", flush=True, end="\r")
+        save_joint_states(joints)
+        save_imu(imu_link_8)
     else:
-        print("Not Home Position - saving data")
+        print("Home Position", flush=True, end="\r")
 
 
-def listener_new():
+def save_joint_states(data):
+    joint_position = data.position
+    joint_velocity = data.velocity
+    joint_effort = data.effort
+
+    rospy.loginfo("Joint Position %s", joint_position)
+    rospy.loginfo("Joint Velocity %s", joint_velocity)
+    rospy.loginfo("Joint Effort %s", joint_effort)
+
+    file_position = open(data_file_joint_position, "a")
+    file_position.write(str(joint_position))
+    file_position.close()
+
+    file_velocity = open(data_file_joint_velocity, "a")
+    file_velocity.write(str(joint_velocity))
+    file_velocity.close()
+
+    file_effort = open(data_file_joint_effort, "a")
+    file_effort.write(str(joint_effort))
+    file_effort.close()
+
+
+def save_imu(data):
+    orientation = data.orientation
+    angular_velocity = data.angular_velocity
+    linear_acceleration = data.linear_acceleration
+
+    rospy.loginfo("Orientation         %s", orientation)
+    rospy.loginfo("Angular Velocity    %s", angular_velocity)
+    rospy.loginfo("Linear Acceleration %s", linear_acceleration)
+
+    file_position = open(data_file_imu_link8_orientation, "a")
+    file_position.write(str(orientation))
+    file_position.close()
+
+    file_velocity = open(data_file_imu_link8_angular_velocity, "a")
+    file_velocity.write(str(angular_velocity))
+    file_velocity.close()
+
+    file_effort = open(data_file_imu_link8_linear_acceleration, "a")
+    file_effort.write(str(linear_acceleration))
+    file_effort.close()
+
+
+def listener_ros_topics():
     file_position = open(data_file_joint_position, "w")
     file_position.close()
-    
+
     file_velocity = open(data_file_joint_velocity, "w")
     file_velocity.close()
-    
+
     file_effort = open(data_file_joint_effort, "w")
     file_effort.close()
 
     rospy.init_node('listener_new', anonymous=False)
-    rospy.Subscriber("joint_states_issac", JointState, callback)
+    jointStates_sub = message_filters.Subscriber('joint_states_issac', JointState)
+    imuLink8_sub = message_filters.Subscriber('imu_link8', Imu)
+    ts = message_filters.TimeSynchronizer([jointStates_sub, imuLink8_sub], 10)
+    ts.registerCallback(callback_check_home_position)
     rospy.spin()
 
 
@@ -86,20 +122,75 @@ def read_joints_data_from_file(data_file):
     filetext = text_file.read()
     text_file.close()
 
-    result = str(re.findall('(.*)',filetext))
+    result = str(re.findall('(.*)', filetext))
     result = result.split(')')
 
-    for i in range(0,len(result)):
-        result[i] = result[i].replace('(','')
-    
-    for i in range(1,len(result)-1):
-        joints.append(result[i].split(','))
-        #print(result[i])
-        
-    return joints
-    
+    for i in range(0, len(result)):
+        result[i] = result[i].replace('(', '')
 
-def plot_results(joints_data, y_label):
+    for i in range(1, len(result) - 1):
+        joints.append(result[i].split(','))
+
+    for k in range(0, len(joints)):
+        for z in range(0, 9):
+            if joints[k][z] == " nan":
+                joints[k][z] = '0.0'
+            if joints[k][z] == "nan":
+                joints[k][z] = '0.0'
+
+    return joints
+
+
+def read_imu_data_from_file(data_file):
+    x = []
+    y = []
+    z = []
+
+    text_file = open(data_file, "r")
+    filetext = text_file.read()
+    text_file.close()
+
+    x_result = str(re.findall('x: (.*)', filetext))
+    x_result = x_result.split(' ')
+
+    y_result = str(re.findall('y: (.*)', filetext))
+    y_result = y_result.split(' ')
+
+    z_result = str(re.findall('z: (.*)', filetext))
+    z_result = z_result.split(' ')
+
+    for i in range(0, len(x_result)):
+        x_result[i] = x_result[i].replace('[', '').replace("'", "").replace(']', '')\
+            .replace(',', '')
+        x.append(x_result[i])
+
+    for j in range(0, len(y_result)):
+        y_result[j] = y_result[j].replace('[', '').replace("'", "").replace(']', '')\
+            .replace(',', '')
+        y.append(y_result[j])
+
+    for k in range(0, len(z_result)):
+        z_result[k] = z_result[k].replace('[', '').replace("'", "").replace(']', '')\
+            .replace(',', '').replace('x:', '')
+        z.append(z_result[k])
+
+    ## CONVERT DATA TO FLOAT
+    x_data = []
+    for data in x:
+        x_data.append(float(data))
+
+    y_data = []
+    for data in y:
+        y_data.append(float(data))
+
+    z_data = []
+    for data in z:
+        z_data.append(float(data))
+
+    return x_data, y_data, z_data
+
+
+def plot_joints_results(joints_data, y_label):
     joint_0 = []
     joint_1 = []
     joint_2 = []
@@ -120,7 +211,7 @@ def plot_results(joints_data, y_label):
         joint_6.append(float(data[6]))
         joint_7.append(float(data[7]))
         joint_8.append(float(data[8]))
-        
+
     fig1, axs1 = plt.subplots(3)
 
     axs1[0].plot(joint_0)
@@ -129,7 +220,7 @@ def plot_results(joints_data, y_label):
     axs1[1].set_title('joint_1')
     axs1[2].plot(joint_2)
     axs1[2].set_title('joint_2')
-    
+
     fig2, axs2 = plt.subplots(3)
     axs2[0].plot(joint_3)
     axs2[0].set_title('joint_3')
@@ -145,11 +236,10 @@ def plot_results(joints_data, y_label):
     axs3[1].set_title('joint_7')
     axs3[2].plot(joint_8)
     axs3[2].set_title('joint_8')
-    
+
     fig1.tight_layout()
     fig2.tight_layout()
     fig3.tight_layout()
-    
 
     for ax in axs1.flat:
         ax.set(xlabel='samples', ylabel=y_label)
@@ -167,14 +257,58 @@ def plot_results(joints_data, y_label):
         ax.label_outer()
     plt.show()
 
+
+def plot_imu_results(x, y, z, y_label):
+    fig1, axs1 = plt.subplots(3)
+
+    axs1[0].plot(x)
+    axs1[0].set_title('X')
+    axs1[1].plot(y)
+    axs1[1].set_title('Y')
+    axs1[2].plot(z)
+    axs1[2].set_title('Z')
+
+    fig1.tight_layout()
+
+    for ax in axs1.flat:
+        ax.set(xlabel='samples', ylabel=y_label)
+
+    # Hide x labels and tick labels for top plots and y ticks for right plots.
+    for ax in axs1.flat:
+        ax.label_outer()
+
+    plt.show()
+
+
 if __name__ == '__main__':
-    #listener_new()
+    #listener_ros_topics()
+
     joints_position = read_joints_data_from_file(data_file_joint_position)
     joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
     joints_effort = read_joints_data_from_file(data_file_joint_effort)
 
-    #plot_results(joints_position, "Position")
-    plot_results(joints_velocity, "Velocity")
-    #plot_results(joints_effort, "Effort")
+    imu_x_ang_vel, imu_y_ang_vel, imu_z_ang_vel = read_imu_data_from_file(data_file_imu_link8_angular_velocity)
+    imu_x_lin_acc, imu_y_lin_acc, imu_z_lin_acc = read_imu_data_from_file(data_file_imu_link8_linear_acceleration)
+    imu_x_ori, imu_y_ori, imu_z_ori = read_imu_data_from_file(data_file_imu_link8_orientation)
 
-    
+    # plot_imu_results(imu_x_ang_vel, imu_y_ang_vel, imu_z_ang_vel, "Angular Velocity")
+    # plot_imu_results(imu_x_lin_acc, imu_y_lin_acc, imu_z_lin_acc, "Linear Acceleration")
+    # plot_imu_results(imu_x_ori, imu_y_ori, imu_z_ori, "Orientation")
+    # plot_joints_results(joints_velocity, "Velocity")
+    # plot_results(joints_effort, "Effort")
+
+    print(len(joints_position))
+    print(len(joints_velocity))
+    print(len(joints_effort))
+
+    print(len(imu_x_ang_vel))
+    print(len(imu_x_lin_acc))
+    print(len(imu_x_ori))
+
+    print(len(imu_y_ang_vel))
+    print(len(imu_y_lin_acc))
+    print(len(imu_y_ori))
+
+    print(len(imu_z_ang_vel))
+    print(len(imu_z_lin_acc))
+    print(len(imu_z_ori))

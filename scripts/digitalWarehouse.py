@@ -92,7 +92,7 @@ rospy.init_node("move_group_python_interface_tutorial", anonymous=False)
 #pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
 joint_command_isaac = JointState()
 
-pub_gripper = rospy.Publisher("/gripper_command", Grasp,queue_size=20)
+pub_gripper = rospy.Publisher("/gripper_command", Grasp, queue_size=20)
 
 positions = []
 velocities = []
@@ -274,7 +274,7 @@ class MoveGroupPythonInterfaceTutorial(object):
         move_group.set_max_acceleration_scaling_factor(1.0)
 
         #move_group.set_orientation_target(quat_tf, end_effector_link = "panda_hand")
-        move_group.set_pose_target(pose_goal, end_effector_link = "panda_hand")
+        move_group.set_pose_target(pose_goal, end_effector_link="panda_hand")
         
 
 
