@@ -1,0 +1,199 @@
+{
+  "frames": [
+    {
+      "header": {
+        "seq": 1000,
+        "stamp": 123123123123
+      },
+      "joint_0": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_1": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_2": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_3": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_4": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_5": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_6": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_7": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      },
+      "joint_8": {
+        "effort": 6.656,
+        "velocity": 1.5,
+        "imu": {
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "angular_velocity": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "linear_acceleration": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        }
+      }
+    }
+  ]
+}

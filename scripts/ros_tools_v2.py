@@ -6,6 +6,7 @@ import re
 import matplotlib.pyplot as plt
 from matplotlib.collections import EventCollection
 import message_filters
+import json
 
 data_file_joint_position = "/home/filipe/Desktop/Dissertação/data_position.txt"
 data_file_joint_velocity = "/home/filipe/Desktop/Dissertação/data_velocity.txt"
@@ -47,10 +48,13 @@ data_file_imu_link8_orientation = "/home/filipe/Desktop/Dissertação/imu_link8_
 data_file_imu_link8_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link8_angular_velocity.txt"
 data_file_imu_link8_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link8_linear_acceleration.txt"
 
+json_file = "/home/filipe/Desktop/Dissertação/json_file.json"
+
 velocity_read = False
 robot_home_position = False
 
 
+## OK
 def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
                                  imu_link_6, imu_link_7, imu_link_8):
     joint_position = joints.position
@@ -80,86 +84,21 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
 
     if not home:
         print("Not Home Position", flush=True, end="\r")
-        save_joint_states(joints)
-        save_imu(imu_link_0, data_file_imu_link0_orientation, data_file_imu_link0_angular_velocity,
-                 data_file_imu_link0_linear_acceleration)
-
-        save_imu(imu_link_1, data_file_imu_link1_orientation, data_file_imu_link1_angular_velocity,
-                 data_file_imu_link1_linear_acceleration)
-
-        save_imu(imu_link_2, data_file_imu_link2_orientation, data_file_imu_link2_angular_velocity,
-                 data_file_imu_link2_linear_acceleration)
-
-        save_imu(imu_link_3, data_file_imu_link3_orientation, data_file_imu_link3_angular_velocity,
-                 data_file_imu_link3_linear_acceleration)
-
-        save_imu(imu_link_4, data_file_imu_link4_orientation, data_file_imu_link4_angular_velocity,
-                 data_file_imu_link4_linear_acceleration)
-
-        save_imu(imu_link_5, data_file_imu_link5_orientation, data_file_imu_link5_angular_velocity,
-                 data_file_imu_link5_linear_acceleration)
-
-        save_imu(imu_link_6, data_file_imu_link6_orientation, data_file_imu_link6_angular_velocity,
-                 data_file_imu_link6_linear_acceleration)
-
-        save_imu(imu_link_7, data_file_imu_link7_orientation, data_file_imu_link7_angular_velocity,
-                 data_file_imu_link7_linear_acceleration)
-
-        save_imu(imu_link_8, data_file_imu_link8_orientation, data_file_imu_link8_angular_velocity,
-                 data_file_imu_link8_linear_acceleration)
+        save_json_data(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3,
+                       imu_link_4, imu_link_5, imu_link_6, imu_link_7, imu_link_8)
     else:
         print("Home Position", flush=True, end="\r")
 
 
-def save_joint_states(data):
-    joint_position = data.position
-    joint_velocity = data.velocity
-    joint_effort = data.effort
-    timeStamp = data.header.stamp
-
-    rospy.loginfo("Timestamp joint           %s", timeStamp)
-    #rospy.loginfo("Joint Position %s", joint_position)
-    #rospy.loginfo("Joint Velocity %s", joint_velocity)
-    #rospy.loginfo("Joint Effort %s", joint_effort)
-
-    file_position = open(data_file_joint_position, "a")
-    file_position.write(str(joint_position))
-    file_position.close()
-
-    file_velocity = open(data_file_joint_velocity, "a")
-    file_velocity.write(str(joint_velocity))
-    file_velocity.close()
-
-    file_effort = open(data_file_joint_effort, "a")
-    file_effort.write(str(joint_effort))
-    file_effort.close()
-
-
-def save_imu(data, orientation_file_name, angular_velocity_file_name, linear_acceleration_file_name):
-    orientation = data.orientation
-    angular_velocity = data.angular_velocity
-    linear_acceleration = data.linear_acceleration
-    timeStamp = data.header.stamp
-
-    rospy.loginfo("Timestamp IMU             %s", timeStamp)
-    #rospy.loginfo("Orientation         %s", orientation)
-    #rospy.loginfo("Angular Velocity    %s", angular_velocity)
-    #rospy.loginfo("Linear Acceleration %s", linear_acceleration)
-
-    file_position = open(orientation_file_name, "a")
-    file_position.write(str(orientation))
-    file_position.close()
-
-    file_velocity = open(angular_velocity_file_name, "a")
-    file_velocity.write(str(angular_velocity))
-    file_velocity.close()
-
-    file_effort = open(linear_acceleration_file_name, "a")
-    file_effort.write(str(linear_acceleration))
-    file_effort.close()
-
-
+## OK
 def listener_ros_topics():
+    json_object = json.dumps({
+        "frames": []
+    }, indent=2)
+
+    with open(json_file, "w") as outfile:
+        outfile.write(json_object)
+
     file_position = open(data_file_joint_position, "w")
     file_position.close()
 
@@ -295,17 +234,17 @@ def read_imu_data_from_file(data_file):
     z_result = z_result.split(' ')
 
     for i in range(0, len(x_result)):
-        x_result[i] = x_result[i].replace('[', '').replace("'", "").replace(']', '')\
+        x_result[i] = x_result[i].replace('[', '').replace("'", "").replace(']', '') \
             .replace(',', '')
         x.append(x_result[i])
 
     for j in range(0, len(y_result)):
-        y_result[j] = y_result[j].replace('[', '').replace("'", "").replace(']', '')\
+        y_result[j] = y_result[j].replace('[', '').replace("'", "").replace(']', '') \
             .replace(',', '')
         y.append(y_result[j])
 
     for k in range(0, len(z_result)):
-        z_result[k] = z_result[k].replace('[', '').replace("'", "").replace(']', '')\
+        z_result[k] = z_result[k].replace('[', '').replace("'", "").replace(']', '') \
             .replace(',', '').replace('x:', '')
         z.append(z_result[k])
 
@@ -415,8 +354,293 @@ def plot_imu_results(x, y, z, y_label):
     plt.show()
 
 
+## OK
+def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
+                   imu_link_6, imu_link_7, imu_link_8):
+    joint_velocity_0 = data.velocity[0]
+    joint_effort_0 = data.effort[0]
+    if str(joint_velocity_0) == "nan":
+        joint_velocity_0 = 0
+    if str(joint_effort_0) == "nan":
+        joint_effort_0 = 0
+
+    joint_velocity_1 = data.velocity[1]
+    joint_effort_1 = data.effort[1]
+    if str(joint_velocity_1) == "nan":
+        joint_velocity_1 = 0
+    if str(joint_effort_1) == "nan":
+        joint_effort_1 = 0
+
+    joint_velocity_2 = data.velocity[2]
+    joint_effort_2 = data.effort[2]
+    if str(joint_velocity_2) == "nan":
+        joint_velocity_2 = 0
+    if str(joint_effort_2) == "nan":
+        joint_effort_2 = 0
+
+    joint_velocity_3 = data.velocity[3]
+    joint_effort_3 = data.effort[3]
+    if str(joint_velocity_3) == "nan":
+        joint_velocity_3 = 0
+    if str(joint_effort_3) == "nan":
+        joint_effort_3 = 0
+
+    joint_velocity_4 = data.velocity[4]
+    joint_effort_4 = data.effort[4]
+    if str(joint_velocity_4) == "nan":
+        joint_velocity_4 = 0
+    if str(joint_effort_4) == "nan":
+        joint_effort_4 = 0
+
+    joint_velocity_5 = data.velocity[5]
+    joint_effort_5 = data.effort[5]
+    if str(joint_velocity_5) == "nan":
+        joint_velocity_5 = 0
+    if str(joint_effort_5) == "nan":
+        joint_effort_5 = 0
+
+    joint_velocity_6 = data.velocity[6]
+    joint_effort_6 = data.effort[6]
+    if str(joint_velocity_6) == "nan":
+        joint_velocity_6 = 0
+    if str(joint_effort_6) == "nan":
+        joint_effort_6 = 0
+
+    joint_velocity_7 = data.velocity[7]
+    joint_effort_7 = data.effort[7]
+    if str(joint_velocity_7) == "nan":
+        joint_velocity_7 = 0
+    if str(joint_effort_7) == "nan":
+        joint_effort_7 = 0
+
+    joint_velocity_8 = data.velocity[8]
+    joint_effort_8 = data.effort[8]
+    if str(joint_velocity_8) == "nan":
+        joint_velocity_8 = 0
+    if str(joint_effort_8) == "nan":
+        joint_effort_8 = 0
+
+    entry = {
+        "header": {
+            "seq": str(data.header.seq),
+            "stamp": str(data.header.stamp)
+        },
+        "joint_0": {
+            "effort": joint_effort_0,
+            "velocity": joint_velocity_0,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_0.orientation.x,
+                    "y": imu_link_0.orientation.y,
+                    "z": imu_link_0.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_0.angular_velocity.x,
+                    "y": imu_link_0.angular_velocity.y,
+                    "z": imu_link_0.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_0.linear_acceleration.x,
+                    "y": imu_link_0.linear_acceleration.y,
+                    "z": imu_link_0.linear_acceleration.z
+                }
+            }
+        },
+        "joint_1": {
+            "effort": joint_effort_1,
+            "velocity": joint_velocity_1,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_1.orientation.x,
+                    "y": imu_link_1.orientation.y,
+                    "z": imu_link_1.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_1.angular_velocity.x,
+                    "y": imu_link_1.angular_velocity.y,
+                    "z": imu_link_1.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_1.linear_acceleration.x,
+                    "y": imu_link_1.linear_acceleration.y,
+                    "z": imu_link_1.linear_acceleration.z
+                }
+            }
+        },
+        "joint_2": {
+            "effort": joint_effort_2,
+            "velocity": joint_velocity_2,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_2.orientation.x,
+                    "y": imu_link_2.orientation.y,
+                    "z": imu_link_2.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_2.angular_velocity.x,
+                    "y": imu_link_2.angular_velocity.y,
+                    "z": imu_link_2.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_2.linear_acceleration.x,
+                    "y": imu_link_2.linear_acceleration.y,
+                    "z": imu_link_2.linear_acceleration.z
+                }
+            }
+        },
+        "joint_3": {
+            "effort": joint_effort_3,
+            "velocity": joint_velocity_3,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_3.orientation.x,
+                    "y": imu_link_3.orientation.y,
+                    "z": imu_link_3.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_3.angular_velocity.x,
+                    "y": imu_link_3.angular_velocity.y,
+                    "z": imu_link_3.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_3.linear_acceleration.x,
+                    "y": imu_link_3.linear_acceleration.y,
+                    "z": imu_link_3.linear_acceleration.z
+                }
+            }
+        },
+        "joint_4": {
+            "effort": joint_effort_4,
+            "velocity": joint_velocity_4,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_4.orientation.x,
+                    "y": imu_link_4.orientation.y,
+                    "z": imu_link_4.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_4.angular_velocity.x,
+                    "y": imu_link_4.angular_velocity.y,
+                    "z": imu_link_4.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_4.linear_acceleration.x,
+                    "y": imu_link_4.linear_acceleration.y,
+                    "z": imu_link_4.linear_acceleration.z
+                }
+            }
+        },
+        "joint_5": {
+            "effort": joint_effort_5,
+            "velocity": joint_velocity_5,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_5.orientation.x,
+                    "y": imu_link_5.orientation.y,
+                    "z": imu_link_5.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_5.angular_velocity.x,
+                    "y": imu_link_5.angular_velocity.y,
+                    "z": imu_link_5.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_5.linear_acceleration.x,
+                    "y": imu_link_5.linear_acceleration.y,
+                    "z": imu_link_5.linear_acceleration.z
+                }
+            }
+        },
+        "joint_6": {
+            "effort": joint_effort_6,
+            "velocity": joint_velocity_6,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_6.orientation.x,
+                    "y": imu_link_6.orientation.y,
+                    "z": imu_link_6.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_6.angular_velocity.x,
+                    "y": imu_link_6.angular_velocity.y,
+                    "z": imu_link_6.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_6.linear_acceleration.x,
+                    "y": imu_link_6.linear_acceleration.y,
+                    "z": imu_link_6.linear_acceleration.z
+                }
+            }
+        },
+        "joint_7": {
+            "effort": joint_effort_7,
+            "velocity": joint_velocity_7,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_7.orientation.x,
+                    "y": imu_link_7.orientation.y,
+                    "z": imu_link_7.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_7.angular_velocity.x,
+                    "y": imu_link_7.angular_velocity.y,
+                    "z": imu_link_7.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_7.linear_acceleration.x,
+                    "y": imu_link_7.linear_acceleration.y,
+                    "z": imu_link_7.linear_acceleration.z
+                }
+            }
+        },
+        "joint_8": {
+            "effort": joint_effort_8,
+            "velocity": joint_velocity_8,
+            "imu": {
+                "orientation": {
+                    "x": imu_link_8.orientation.x,
+                    "y": imu_link_8.orientation.y,
+                    "z": imu_link_8.orientation.z
+                },
+                "angular_velocity": {
+                    "x": imu_link_8.angular_velocity.x,
+                    "y": imu_link_8.angular_velocity.y,
+                    "z": imu_link_8.angular_velocity.z
+                },
+                "linear_acceleration": {
+                    "x": imu_link_8.linear_acceleration.x,
+                    "y": imu_link_8.linear_acceleration.y,
+                    "z": imu_link_8.linear_acceleration.z
+                }
+            }
+        }
+    }
+    # 1. Read file contents
+    with open(json_file, "r") as file:
+        dataFromJsonFile = json.load(file)
+
+    # 2. Update json object
+    dataFromJsonFile["frames"].append(entry)
+
+    # 3. Write json file
+    with open(json_file, "w") as file:
+        json.dump(dataFromJsonFile, file)
+
+
+def read_json_data():
+    # Opening JSON file
+    with open(json_file) as file:
+        data = json.load(file)
+
+        # Print the type of data variable
+        print("Type:", type(data))
+
+        # Print the data of dictionary
+        print(data["frames"][0]["header"]["seq"])
+
 if __name__ == '__main__':
-    listener_ros_topics()
+    #listener_ros_topics()
+    read_json_data()
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
     # joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
@@ -432,3 +656,5 @@ if __name__ == '__main__':
 
     # plot_joints_results(joints_velocity, "Velocity")
     # plot_results(joints_effort, "Effort")
+
+    # save_json_data()
