@@ -8,46 +8,6 @@ from matplotlib.collections import EventCollection
 import message_filters
 import json
 
-data_file_joint_position = "/home/filipe/Desktop/Dissertação/data_position.txt"
-data_file_joint_velocity = "/home/filipe/Desktop/Dissertação/data_velocity.txt"
-data_file_joint_effort = "/home/filipe/Desktop/Dissertação/data_effort.txt"
-
-data_file_imu_link0_orientation = "/home/filipe/Desktop/Dissertação/imu_link0_orientation.txt"
-data_file_imu_link0_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link0_angular_velocity.txt"
-data_file_imu_link0_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link0_linear_acceleration.txt"
-
-data_file_imu_link1_orientation = "/home/filipe/Desktop/Dissertação/imu_link1_orientation.txt"
-data_file_imu_link1_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link1_angular_velocity.txt"
-data_file_imu_link1_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link1_linear_acceleration.txt"
-
-data_file_imu_link2_orientation = "/home/filipe/Desktop/Dissertação/imu_link2_orientation.txt"
-data_file_imu_link2_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link2_angular_velocity.txt"
-data_file_imu_link2_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link2_linear_acceleration.txt"
-
-data_file_imu_link3_orientation = "/home/filipe/Desktop/Dissertação/imu_link3_orientation.txt"
-data_file_imu_link3_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link3_angular_velocity.txt"
-data_file_imu_link3_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link3_linear_acceleration.txt"
-
-data_file_imu_link4_orientation = "/home/filipe/Desktop/Dissertação/imu_link4_orientation.txt"
-data_file_imu_link4_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link4_angular_velocity.txt"
-data_file_imu_link4_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link4_linear_acceleration.txt"
-
-data_file_imu_link5_orientation = "/home/filipe/Desktop/Dissertação/imu_link5_orientation.txt"
-data_file_imu_link5_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link5_angular_velocity.txt"
-data_file_imu_link5_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link5_linear_acceleration.txt"
-
-data_file_imu_link6_orientation = "/home/filipe/Desktop/Dissertação/imu_link6_orientation.txt"
-data_file_imu_link6_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link6_angular_velocity.txt"
-data_file_imu_link6_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link6_linear_acceleration.txt"
-
-data_file_imu_link7_orientation = "/home/filipe/Desktop/Dissertação/imu_link7_orientation.txt"
-data_file_imu_link7_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link7_angular_velocity.txt"
-data_file_imu_link7_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link7_linear_acceleration.txt"
-
-data_file_imu_link8_orientation = "/home/filipe/Desktop/Dissertação/imu_link8_orientation.txt"
-data_file_imu_link8_angular_velocity = "/home/filipe/Desktop/Dissertação/imu_link8_angular_velocity.txt"
-data_file_imu_link8_linear_acceleration = "/home/filipe/Desktop/Dissertação/imu_link8_linear_acceleration.txt"
-
 json_file = "/home/filipe/Desktop/Dissertação/json_file.json"
 
 velocity_read = False
@@ -99,78 +59,6 @@ def listener_ros_topics():
     with open(json_file, "w") as outfile:
         outfile.write(json_object)
 
-    file_position = open(data_file_joint_position, "w")
-    file_position.close()
-
-    file_velocity = open(data_file_joint_velocity, "w")
-    file_velocity.close()
-
-    file_effort = open(data_file_joint_effort, "w")
-    file_effort.close()
-
-    file = open(data_file_imu_link0_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link0_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link0_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link1_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link1_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link1_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link2_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link2_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link2_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link3_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link3_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link3_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link4_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link4_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link4_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link5_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link5_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link5_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link6_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link6_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link6_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link7_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link7_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link7_linear_acceleration, "w")
-    file.close()
-
-    file = open(data_file_imu_link8_orientation, "w")
-    file.close()
-    file = open(data_file_imu_link8_angular_velocity, "w")
-    file.close()
-    file = open(data_file_imu_link8_linear_acceleration, "w")
-    file.close()
-    print("Start listening ")
     rospy.init_node('listener_new', anonymous=False)
     jointStates_sub = message_filters.Subscriber('joint_states_issac', JointState)
     imuLink0_sub = message_filters.Subscriber('imu_link0', Imu)
@@ -630,17 +518,21 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
 def read_json_data():
     # Opening JSON file
     with open(json_file) as file:
-        data = json.load(file)
+        jsonData = json.load(file)
 
-        # Print the type of data variable
-        print("Type:", type(data))
+    return jsonData
 
-        # Print the data of dictionary
-        print(data["frames"][0]["header"]["seq"])
 
 if __name__ == '__main__':
     #listener_ros_topics()
-    read_json_data()
+    jsonData = read_json_data()
+
+    # Print the type of data variable
+    print("Type:", type(jsonData))
+
+    # Print the data of dictionary
+    print(jsonData["frames"][0]["joint_0"]["imu"]["linear_acceleration"])
+    print(len(jsonData["frames"]))
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
     # joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
