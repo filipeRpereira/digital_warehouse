@@ -515,6 +515,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
         json.dump(dataFromJsonFile, file)
 
 
+## OK
 def read_json_data():
     # Opening JSON file
     with open(json_file) as file:
@@ -523,16 +524,123 @@ def read_json_data():
     return jsonData
 
 
+## Colocar unidades nos gráficos
+def plot_data(json_data):
+    total_frames = len(jsonData["frames"])
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+    for joint in listOfJoints:
+        print(joint)
+
+        '''++++++++++++++++   linear_acceleration   ++++++++++++++++'''
+        acc_x = []
+        acc_y = []
+        acc_z = []
+        for i in range(len(jsonData["frames"])):
+            acc_x.append(jsonData["frames"][i][joint]["imu"]["linear_acceleration"]["x"])
+        for i in range(len(jsonData["frames"])):
+            acc_y.append(jsonData["frames"][i][joint]["imu"]["linear_acceleration"]["y"])
+        for i in range(len(jsonData["frames"])):
+            acc_z.append(jsonData["frames"][i][joint]["imu"]["linear_acceleration"]["z"])
+
+        fig1, axs1 = plt.subplots(3)
+        axs1[0].plot(acc_x)
+        axs1[0].set_title('Linear Acceleration X - ' + joint)
+        axs1[1].plot(acc_y)
+        axs1[1].set_title('Linear Acceleration Y - ' + joint)
+        axs1[2].plot(acc_z)
+        axs1[2].set_title('Linear Acceleration Z - ' + joint)
+        fig1.tight_layout()
+        yLabel = "Linear Acceleration"
+        for ax in axs1.flat:
+            ax.set(xlabel='samples', ylabel=yLabel)
+        for ax in axs1.flat:
+            ax.label_outer()
+        #plt.show()
+
+        '''++++++++++++++++   angular_velocity   ++++++++++++++++'''
+        vel_x = []
+        vel_y = []
+        vel_z = []
+        for i in range(len(jsonData["frames"])):
+            vel_x.append(jsonData["frames"][i][joint]["imu"]["angular_velocity"]["x"])
+        for i in range(len(jsonData["frames"])):
+            vel_y.append(jsonData["frames"][i][joint]["imu"]["angular_velocity"]["y"])
+        for i in range(len(jsonData["frames"])):
+            vel_z.append(jsonData["frames"][i][joint]["imu"]["angular_velocity"]["z"])
+
+        fig2, axs1 = plt.subplots(3)
+        axs1[0].plot(vel_x)
+        axs1[0].set_title('Angular Velocity X - ' + joint)
+        axs1[1].plot(vel_y)
+        axs1[1].set_title('Angular Velocity Y - ' + joint)
+        axs1[2].plot(vel_z)
+        axs1[2].set_title('Angular Velocity Z - ' + joint)
+        fig2.tight_layout()
+        yLabel = "Angular Velocity"
+        for ax in axs1.flat:
+            ax.set(xlabel='samples', ylabel=yLabel)
+        for ax in axs1.flat:
+            ax.label_outer()
+        #plt.show()
+
+        '''++++++++++++++++   orientation   ++++++++++++++++'''
+        ori_x = []
+        ori_y = []
+        ori_z = []
+        for i in range(len(jsonData["frames"])):
+            ori_x.append(jsonData["frames"][i][joint]["imu"]["orientation"]["x"])
+        for i in range(len(jsonData["frames"])):
+            ori_y.append(jsonData["frames"][i][joint]["imu"]["orientation"]["y"])
+        for i in range(len(jsonData["frames"])):
+            ori_z.append(jsonData["frames"][i][joint]["imu"]["orientation"]["z"])
+
+        fig3, axs1 = plt.subplots(3)
+        axs1[0].plot(ori_x)
+        axs1[0].set_title('Orientation X - ' + joint)
+        axs1[1].plot(ori_y)
+        axs1[1].set_title('Orientation Y - ' + joint)
+        axs1[2].plot(ori_z)
+        axs1[2].set_title('Orientation Z - ' + joint)
+        fig2.tight_layout()
+        yLabel = "Orientation"
+        for ax in axs1.flat:
+            ax.set(xlabel='samples', ylabel=yLabel)
+        for ax in axs1.flat:
+            ax.label_outer()
+        #plt.show()
+
+        '''++++++++++++++++   effort   ++++++++++++++++'''
+        eff = []
+        for i in range(len(jsonData["frames"])):
+            eff.append(jsonData["frames"][i][joint]["effort"])
+
+        '''++++++++++++++++   velocity   ++++++++++++++++'''
+        vel = []
+        for i in range(len(jsonData["frames"])):
+            vel.append(jsonData["frames"][i][joint]["velocity"])
+
+        fig4, axs1 = plt.subplots(2)
+        axs1[0].plot(eff)
+        axs1[0].set_title('Effort - ' + joint)
+        axs1[1].plot(vel)
+        axs1[1].set_title('Velocity - ' + joint)
+
+        fig2.tight_layout()
+        yLabel = ""
+        for ax in axs1.flat:
+            ax.set(xlabel='samples', ylabel=yLabel)
+        for ax in axs1.flat:
+            ax.label_outer()
+        plt.show()
+
+
 if __name__ == '__main__':
     #listener_ros_topics()
     jsonData = read_json_data()
 
-    # Print the type of data variable
-    print("Type:", type(jsonData))
+    plot_data(jsonData)
 
-    # Print the data of dictionary
-    print(jsonData["frames"][0]["joint_0"]["imu"]["linear_acceleration"])
-    print(len(jsonData["frames"]))
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
     # joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
