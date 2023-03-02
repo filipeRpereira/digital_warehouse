@@ -534,7 +534,7 @@ def get_execution_time(jsonData):
 
 
 ## OK
-def get_angular_acceleration(jsonData):
+def get_angular_acceleration(jsonData, plot):
     total_frames = len(jsonData["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
@@ -584,7 +584,8 @@ def get_angular_acceleration(jsonData):
     for ax in axs1.flat:
         ax.set(xlabel='Amostras', ylabel=yLabel)
 
-    #plt.show()
+    if plot:
+        plt.show()
 
     return angular_acceleration_array
 
@@ -618,6 +619,8 @@ if __name__ == '__main__':
     parser.add_argument('--get_angular_acc', help='Get the sum of angular acceleration of'
                                                   'each joint.',
                         required=False, default=False)
+    parser.add_argument('--plot_acc', help='Plot the angular acceleration.',
+                        required=False, default=False)
 
     args = parser.parse_args()
 
@@ -635,7 +638,12 @@ if __name__ == '__main__':
 
     if args.get_angular_acc:
         jsonData = read_json_data()
-        ang_acceleration = get_angular_acceleration(jsonData)
+        ang_acceleration = get_angular_acceleration(jsonData, False)
         angular_acceleration_sum = get_angular_acceleration_sum(ang_acceleration)
         print("Angular acceleration: ")
         print(angular_acceleration_sum)
+
+    if args.plot_acc:
+        jsonData = read_json_data()
+        get_angular_acceleration(jsonData, args.plot_acc)
+
