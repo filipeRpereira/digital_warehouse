@@ -559,24 +559,57 @@ def get_angular_acceleration(jsonData):
     total_frames = len(jsonData["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
+    angular_acceleration_array = np.empty(shape=(len(listOfJoints), total_frames-1))
+    angular_acceleration_array.fill(0)
 
-    ang_acceleration_0 = []
-    ang_acceleration_1 = []
-    ang_acceleration_2 = []
-    ang_acceleration_3 = []
-    ang_acceleration_4 = []
-    ang_acceleration_5 = []
-    ang_acceleration_6 = []
-    ang_acceleration_7 = []
-    ang_acceleration_8 = []
+    for i in range(len(listOfJoints)):
+        for j in range(1, len(jsonData["frames"])):
+            angular_acceleration_array[i][j-1] = jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"]
 
-    #for i in range(len(listOfJoints)):
-    i = 0
-    #    print(listOfJoints[i])
-    for j in range(1, len(jsonData["frames"])):
-        ang_acceleration_0.append(jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"])
+    fig1, axs1 = plt.subplots(3)
+    axs1[0].plot(angular_acceleration_array[0])
+    axs1[0].set_title('Aceleração Angular - Junta 0')
+    axs1[1].plot(angular_acceleration_array[1])
+    axs1[1].set_title('Aceleração Angular - Junta 1')
+    axs1[2].plot(angular_acceleration_array[2])
+    axs1[2].set_title('Aceleração Angular - Junta 2')
 
-    return ang_acceleration_0
+    fig1.tight_layout()
+    yLabel = "º/s²"
+    for ax in axs1.flat:
+        ax.set(xlabel='Amostras', ylabel=yLabel)
+
+    fig2, axs1 = plt.subplots(3)
+    axs1[0].plot(angular_acceleration_array[3])
+    axs1[0].set_title('Aceleração Angular - Junta 3')
+    axs1[1].plot(angular_acceleration_array[4])
+    axs1[1].set_title('Aceleração Angular - Junta 4')
+    axs1[2].plot(angular_acceleration_array[5])
+    axs1[2].set_title('Aceleração Angular - Junta 5')
+
+    fig2.tight_layout()
+    yLabel = "º/s²"
+    for ax in axs1.flat:
+        ax.set(xlabel='Amostras', ylabel=yLabel)
+
+    fig3, axs1 = plt.subplots(3)
+    axs1[0].plot(angular_acceleration_array[6])
+    axs1[0].set_title('Aceleração Angular - Junta 6')
+    axs1[1].plot(angular_acceleration_array[7])
+    axs1[1].set_title('Aceleração Angular - Junta 7')
+    axs1[2].plot(angular_acceleration_array[8])
+    axs1[2].set_title('Aceleração Angular - Junta 8')
+
+    fig3.tight_layout()
+    yLabel = "º/s²"
+    for ax in axs1.flat:
+        ax.set(xlabel='Amostras', ylabel=yLabel)
+
+    #plt.show()
+
+    return angular_acceleration_array
+
+
 if __name__ == '__main__':
     #listener_ros_topics()
     jsonData = read_json_data()
@@ -585,24 +618,10 @@ if __name__ == '__main__':
     #acc = get_acc_sum(jsonData)
     #ang_vel = get_angular_velocity_sum(jsonData)
     #eff = get_effort_sum(jsonData)
-    ang_acceleration_0 = get_angular_acceleration(jsonData)
+    ang_acceleration = get_angular_acceleration(jsonData)
 
-    for a in ang_acceleration_0:
-        print(a)
 
-    fig4, axs1 = plt.subplots(2)
-    axs1[0].plot(ang_acceleration_0)
-    axs1[0].set_title('Effort - ')
-    axs1[1].plot(ang_acceleration_0)
-    axs1[1].set_title('Velocity - ')
 
-    fig4.tight_layout()
-    yLabel = ""
-    for ax in axs1.flat:
-        ax.set(xlabel='samples', ylabel=yLabel)
-    for ax in axs1.flat:
-        ax.label_outer()
-    plt.show()
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
     # joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
