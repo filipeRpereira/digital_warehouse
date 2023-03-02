@@ -81,10 +81,8 @@ for name in MoveItErrorCodes.__dict__.keys():
         code = MoveItErrorCodes.__dict__[name]
         moveit_error_dict[code] = name
 
-
 from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
-
 
 moveit_commander.roscpp_initialize(sys.argv)
 rospy.init_node("move_group_python_interface_tutorial", anonymous=False)
@@ -899,7 +897,6 @@ class MoveGroupPythonInterfaceTutorial(object):
         )
 
 
-
 def main():
     try:
         print("")
@@ -939,7 +936,6 @@ def main():
         tutorial.go_to_pose_goal(0.3, 0.2, 0.22)
         tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
 
-
         tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
         tutorial.go_to_pose_goal(-0.3, 0.2, 0.22)
         tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
@@ -956,13 +952,11 @@ def main():
         tutorial.go_to_pose_goal(-0.3, -0.2, 0.22)
         tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
 
-
         tutorial.go_to_joint_state()
 
         print("time: ")
         end = time.time()
         print(end - start)
-        
 
     except rospy.ROSInterruptException:
         return
