@@ -475,7 +475,7 @@ def get_acc_sum(jsonData):
     total_frames = len(jsonData["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
-    acc_sum = []
+
     acc = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
                     [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
                     [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
@@ -501,8 +501,8 @@ def get_acc_sum(jsonData):
         print("acc_z: ", acc_z)
         print()
         acc[i][0] = acc_x
-        acc[i][0] = acc_y
-        acc[i][0] = acc_z
+        acc[i][1] = acc_y
+        acc[i][2] = acc_z
 
     print(acc[0][0])
     print(acc[1][0])
