@@ -12,11 +12,7 @@ import time
 
 json_file = "/home/filipe/Desktop/Dissertação/json_file.json"
 
-velocity_read = False
 robot_home_position = False
-execution_time = 0
-trigger_execution_time = False
-start = 0
 
 
 ## OK
@@ -46,27 +42,15 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
             home = False
 
     global robot_home_position
-    global trigger_execution_time
-    global start
-    global execution_time
 
     if not home:
         print("Not Home Position", flush=True, end="\r")
         save_json_data(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3,
                        imu_link_4, imu_link_5, imu_link_6, imu_link_7, imu_link_8)
 
-        # if trigger_execution_time == False:
-        #    start = time.time()
-
-        # trigger_execution_time = True
     else:
         print("Home Position", flush=True, end="\r")
-        # if trigger_execution_time:
-        #    print()
-        #    print("execution time: ")
-        #    execution_time = time.time()
-        #    print(execution_time - start)
-        # trigger_execution_time = False
+
 
 
 ## OK
@@ -456,7 +440,7 @@ def plot_data(json_data):
         axs1[1].set_title('Orientation Y - ' + joint)
         axs1[2].plot(ori_z)
         axs1[2].set_title('Orientation Z - ' + joint)
-        fig2.tight_layout()
+        fig3.tight_layout()
         yLabel = "Orientation"
         for ax in axs1.flat:
             ax.set(xlabel='samples', ylabel=yLabel)
@@ -480,7 +464,7 @@ def plot_data(json_data):
         axs1[1].plot(vel)
         axs1[1].set_title('Velocity - ' + joint)
 
-        fig2.tight_layout()
+        fig4.tight_layout()
         yLabel = ""
         for ax in axs1.flat:
             ax.set(xlabel='samples', ylabel=yLabel)
@@ -499,7 +483,7 @@ def get_acc_sum(jsonData):
                     [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
 
     for i in range(len(listOfJoints)):
-        print(listOfJoints[i])
+        #print(listOfJoints[i])
         '''++++++++++++++++   linear_acceleration   ++++++++++++++++'''
         acc_x = 0
         acc_y = 0
@@ -511,11 +495,11 @@ def get_acc_sum(jsonData):
         for m in range(len(jsonData["frames"])):
             acc_z = acc_z + abs(jsonData["frames"][m][listOfJoints[i]]["imu"]["linear_acceleration"]["z"])
 
-        print("total_frames: ", total_frames)
-        print("acc_x: ", acc_x)
-        print("acc_y: ", acc_y)
-        print("acc_z: ", acc_z)
-        print()
+        #print("total_frames: ", total_frames)
+        #print("acc_x: ", acc_x)
+        #print("acc_y: ", acc_y)
+        #print("acc_z: ", acc_z)
+        #print()
         acc[i][0] = acc_x
         acc[i][1] = acc_y
         acc[i][2] = acc_z
@@ -530,34 +514,95 @@ def get_angular_velocity_sum(jsonData):
     ang_vel = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
 
     for i in range(len(listOfJoints)):
-        print(listOfJoints[i])
+        #print(listOfJoints[i])
         ang_vel_ = 0
         for j in range(len(jsonData["frames"])):
             ang_vel_ = ang_vel_ + abs(jsonData["frames"][j][listOfJoints[i]]["velocity"])
 
-        print("angular velocity: ", ang_vel_)
-        print()
+        #print("angular velocity: ", ang_vel_)
+        #print()
         ang_vel[i] = ang_vel_
-    print("total_frames: ", total_frames)
+    #print("total_frames: ", total_frames)
     return ang_vel
+
+
+def get_effort_sum(jsonData):
+    total_frames = len(jsonData["frames"])
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
+    effort = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
+
+    for i in range(len(listOfJoints)):
+        #print(listOfJoints[i])
+        effort_ = 0
+        for j in range(len(jsonData["frames"])):
+            effort_ = effort_ + abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+
+        #print("effort: ", effort_)
+        #print()
+        effort[i] = effort_
+    #print("total_frames: ", total_frames)
+    return effort
 
 
 def get_execution_time(jsonData):
     total_frames = len(jsonData["frames"])
-    for i in range(total_frames):
-        print(jsonData["frames"][i]["header"])
-    print(total_frames)
     sampling_time = 42 / total_frames
-    print("sampling_time (tf): ", sampling_time)
-    print("Execution Time: ", sampling_time * total_frames)
+    #print("sampling_time (tf): ", sampling_time)
+    #print("Execution Time: ", sampling_time * total_frames)
+    execution_time = sampling_time * total_frames
+    return execution_time, sampling_time
 
 
+def get_angular_acceleration(jsonData):
+    total_frames = len(jsonData["frames"])
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
+    ang_acceleration_0 = []
+    ang_acceleration_1 = []
+    ang_acceleration_2 = []
+    ang_acceleration_3 = []
+    ang_acceleration_4 = []
+    ang_acceleration_5 = []
+    ang_acceleration_6 = []
+    ang_acceleration_7 = []
+    ang_acceleration_8 = []
+
+    #for i in range(len(listOfJoints)):
+    i = 0
+    #    print(listOfJoints[i])
+    for j in range(1, len(jsonData["frames"])):
+        ang_acceleration_0.append(jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"])
+
+    return ang_acceleration_0
 if __name__ == '__main__':
-    listener_ros_topics()
+    #listener_ros_topics()
     jsonData = read_json_data()
 
-    get_execution_time(jsonData)
-    get_angular_velocity_sum(jsonData)
+    #execution_time, sampling_time = get_execution_time(jsonData)
+    #acc = get_acc_sum(jsonData)
+    #ang_vel = get_angular_velocity_sum(jsonData)
+    #eff = get_effort_sum(jsonData)
+    ang_acceleration_0 = get_angular_acceleration(jsonData)
+
+    for a in ang_acceleration_0:
+        print(a)
+
+    fig4, axs1 = plt.subplots(2)
+    axs1[0].plot(ang_acceleration_0)
+    axs1[0].set_title('Effort - ')
+    axs1[1].plot(ang_acceleration_0)
+    axs1[1].set_title('Velocity - ')
+
+    fig4.tight_layout()
+    yLabel = ""
+    for ax in axs1.flat:
+        ax.set(xlabel='samples', ylabel=yLabel)
+    for ax in axs1.flat:
+        ax.label_outer()
+    plt.show()
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
     # joints_velocity = read_joints_data_from_file(data_file_joint_velocity)
