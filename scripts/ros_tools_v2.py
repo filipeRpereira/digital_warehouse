@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import EventCollection
 import message_filters
 import json
+import numpy as np
 
 json_file = "/home/filipe/Desktop/Dissertação/json_file.json"
 
@@ -75,171 +76,6 @@ def listener_ros_topics():
                                            imuLink4_sub, imuLink5_sub, imuLink6_sub, imuLink7_sub, imuLink8_sub], 10)
     ts.registerCallback(callback_check_home_position)
     rospy.spin()
-
-
-def read_joints_data_from_file(data_file):
-    joints = []
-
-    text_file = open(data_file, "r")
-    filetext = text_file.read()
-    text_file.close()
-
-    result = str(re.findall('(.*)', filetext))
-    result = result.split(')')
-
-    for i in range(0, len(result)):
-        result[i] = result[i].replace('(', '')
-
-    for i in range(1, len(result) - 1):
-        joints.append(result[i].split(','))
-
-    for k in range(0, len(joints)):
-        for z in range(0, 9):
-            if joints[k][z] == " nan":
-                joints[k][z] = '0.0'
-            if joints[k][z] == "nan":
-                joints[k][z] = '0.0'
-
-    return joints
-
-
-def read_imu_data_from_file(data_file):
-    x = []
-    y = []
-    z = []
-
-    text_file = open(data_file, "r")
-    filetext = text_file.read()
-    text_file.close()
-
-    x_result = str(re.findall('x: (.*)', filetext))
-    x_result = x_result.split(' ')
-
-    y_result = str(re.findall('y: (.*)', filetext))
-    y_result = y_result.split(' ')
-
-    z_result = str(re.findall('z: (.*)', filetext))
-    z_result = z_result.split(' ')
-
-    for i in range(0, len(x_result)):
-        x_result[i] = x_result[i].replace('[', '').replace("'", "").replace(']', '') \
-            .replace(',', '')
-        x.append(x_result[i])
-
-    for j in range(0, len(y_result)):
-        y_result[j] = y_result[j].replace('[', '').replace("'", "").replace(']', '') \
-            .replace(',', '')
-        y.append(y_result[j])
-
-    for k in range(0, len(z_result)):
-        z_result[k] = z_result[k].replace('[', '').replace("'", "").replace(']', '') \
-            .replace(',', '').replace('x:', '')
-        z.append(z_result[k])
-
-    ## CONVERT DATA TO FLOAT
-    x_data = []
-    for data in x:
-        x_data.append(float(data))
-
-    y_data = []
-    for data in y:
-        y_data.append(float(data))
-
-    z_data = []
-    for data in z:
-        z_data.append(float(data))
-
-    return x_data, y_data, z_data
-
-
-def plot_joints_results(joints_data, y_label):
-    joint_0 = []
-    joint_1 = []
-    joint_2 = []
-    joint_3 = []
-    joint_4 = []
-    joint_5 = []
-    joint_6 = []
-    joint_7 = []
-    joint_8 = []
-
-    for data in joints_data:
-        joint_0.append(float(data[0]))
-        joint_1.append(float(data[1]))
-        joint_2.append(float(data[2]))
-        joint_3.append(float(data[3]))
-        joint_4.append(float(data[4]))
-        joint_5.append(float(data[5]))
-        joint_6.append(float(data[6]))
-        joint_7.append(float(data[7]))
-        joint_8.append(float(data[8]))
-
-    fig1, axs1 = plt.subplots(3)
-
-    axs1[0].plot(joint_0)
-    axs1[0].set_title('joint_0')
-    axs1[1].plot(joint_1)
-    axs1[1].set_title('joint_1')
-    axs1[2].plot(joint_2)
-    axs1[2].set_title('joint_2')
-
-    fig2, axs2 = plt.subplots(3)
-    axs2[0].plot(joint_3)
-    axs2[0].set_title('joint_3')
-    axs2[1].plot(joint_4)
-    axs2[1].set_title('joint_4')
-    axs2[2].plot(joint_5)
-    axs2[2].set_title('joint_5')
-
-    fig3, axs3 = plt.subplots(3)
-    axs3[0].plot(joint_6)
-    axs3[0].set_title('joint_6')
-    axs3[1].plot(joint_7)
-    axs3[1].set_title('joint_7')
-    axs3[2].plot(joint_8)
-    axs3[2].set_title('joint_8')
-
-    fig1.tight_layout()
-    fig2.tight_layout()
-    fig3.tight_layout()
-
-    for ax in axs1.flat:
-        ax.set(xlabel='samples', ylabel=y_label)
-    for ax in axs2.flat:
-        ax.set(xlabel='samples', ylabel=y_label)
-    for ax in axs3.flat:
-        ax.set(xlabel='samples', ylabel=y_label)
-
-    # Hide x labels and tick labels for top plots and y ticks for right plots.
-    for ax in axs1.flat:
-        ax.label_outer()
-    for ax in axs2.flat:
-        ax.label_outer()
-    for ax in axs3.flat:
-        ax.label_outer()
-    plt.show()
-
-
-def plot_imu_results(x, y, z, y_label):
-    fig1, axs1 = plt.subplots(3)
-
-    axs1[0].plot(x)
-    axs1[0].set_title('X')
-    axs1[1].plot(y)
-    axs1[1].set_title('Y')
-    axs1[2].plot(z)
-    axs1[2].set_title('Z')
-
-    fig1.tight_layout()
-
-    for ax in axs1.flat:
-        ax.set(xlabel='samples', ylabel=y_label)
-
-    # Hide x labels and tick labels for top plots and y ticks for right plots.
-    for ax in axs1.flat:
-        ax.label_outer()
-
-    plt.show()
 
 
 ## OK
@@ -635,11 +471,55 @@ def plot_data(json_data):
         plt.show()
 
 
+def get_acc_sum(jsonData):
+    total_frames = len(jsonData["frames"])
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+    acc_sum = []
+    acc = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+
+    #for joint in listOfJoints:
+    for i in range(len(listOfJoints)):
+        print(listOfJoints[i])
+
+        '''++++++++++++++++   linear_acceleration   ++++++++++++++++'''
+        acc_x = 0
+        acc_y = 0
+        acc_z = 0
+        for j in range(len(jsonData["frames"])):
+            acc_x = acc_x + jsonData["frames"][j][listOfJoints[i]]["imu"]["linear_acceleration"]["x"]
+        for k in range(len(jsonData["frames"])):
+            acc_y = acc_y + jsonData["frames"][k][listOfJoints[i]]["imu"]["linear_acceleration"]["y"]
+        for m in range(len(jsonData["frames"])):
+            acc_z = acc_z + jsonData["frames"][m][listOfJoints[i]]["imu"]["linear_acceleration"]["z"]
+
+        print("total_frames: ", total_frames)
+        print("acc_x: ", acc_x)
+        print("acc_y: ", acc_y)
+        print("acc_z: ", acc_z)
+        print()
+        acc[i][0] = acc_x
+        acc[i][0] = acc_y
+        acc[i][0] = acc_z
+
+    print(acc[0][0])
+    print(acc[1][0])
+    print(acc[2][0])
+    print(acc[3][0])
+    print(acc[4][0])
+    print(acc[5][0])
+    print(acc[6][0])
+    print(acc[7][0])
+    print(acc[8][0])
+
+
 if __name__ == '__main__':
     #listener_ros_topics()
     jsonData = read_json_data()
 
-    plot_data(jsonData)
+    get_acc_sum(jsonData)
 
 
     # joints_position = read_joints_data_from_file(data_file_joint_position)
