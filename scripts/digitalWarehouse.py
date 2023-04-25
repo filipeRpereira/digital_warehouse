@@ -52,18 +52,13 @@ import rospy
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-import actionlib
 
 from sensor_msgs.msg import JointState
-from control_msgs.msg import GripperCommandAction
 from trajectory_msgs.msg import JointTrajectoryPoint
-from moveit_msgs.msg import Grasp, PickupAction, PickupGoal, PickupResult
-from geometry_msgs.msg import Pose, PoseStamped, PoseArray, Vector3Stamped, Vector3, Quaternion, Point
+from moveit_msgs.msg import Grasp
+from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import MoveItErrorCodes
 import numpy as np
-from geometry_msgs.msg import Quaternion
-
-import ros_tools
 
 try:
     from math import pi, tau, dist, fabs, cos
@@ -81,7 +76,6 @@ for name in MoveItErrorCodes.__dict__.keys():
         code = MoveItErrorCodes.__dict__[name]
         moveit_error_dict[code] = name
 
-from std_msgs.msg import String
 from moveit_commander.conversions import pose_to_list
 
 moveit_commander.roscpp_initialize(sys.argv)
@@ -897,20 +891,8 @@ class MoveGroupPythonInterfaceTutorial(object):
         )
 
 
-def main():
+def job_1():
     try:
-        print("")
-        print("----------------------------------------------------------")
-        print("Welcome to the Digital Warehouse project")
-        print("----------------------------------------------------------")
-        print("Press Ctrl-D to exit at any time")
-        print("")
-
-       
-        
-        #input(
-        #    "============ Press `Enter` to begin the tutorial by setting up the moveit_commander ..."
-        #)
         tutorial = MoveGroupPythonInterfaceTutorial()
         tutorial.add_table()
         tutorial.add_table_placement()
@@ -964,5 +946,60 @@ def main():
         return
 
 
+def job_2():
+    try:
+        tutorial = MoveGroupPythonInterfaceTutorial()
+        tutorial.add_table()
+        tutorial.add_table_placement()
+
+        input("Press any key to continue...")
+
+        start = time.time()
+        tutorial.go_to_joint_state()
+
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.22)
+        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.22)
+        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.22)
+        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.22)
+        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
+
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.22)
+        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
+
+        tutorial.go_to_joint_state()
+
+        print("time: ")
+        end = time.time()
+        print(end - start)
+
+    except rospy.ROSInterruptException:
+        return
+    except KeyboardInterrupt:
+        return
+
+
 if __name__ == "__main__":
-    main()
+    job_2()

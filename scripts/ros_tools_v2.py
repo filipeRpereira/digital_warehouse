@@ -11,9 +11,12 @@ import numpy as np
 import time
 import argparse
 
-json_file = "/home/filipe/Desktop/Dissertação/json_file.json"
+#job_name = "job_2"
+
+
 
 robot_home_position = False
+
 
 ## OK
 def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
@@ -610,19 +613,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
+    parser.add_argument('--job_name', help='Save data from ROS topics.',
+                        required=False, default="job_1")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
-    parser.add_argument('--json_file', help='Json file to save ROS topics data.',
-                        required=False, default=json_file)
     parser.add_argument('--get_exec_time', help='Get the execution time of robot task.',
                         required=False, default=False)
-    parser.add_argument('--get_angular_acc', help='Get the sum of angular acceleration of'
-                                                  'each joint.',
+    parser.add_argument('--get_angular_acc', help='Get the sum of angular acceleration of each joint.',
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration.',
                         required=False, default=False)
 
     args = parser.parse_args()
+
+    job_name = args.job_name
+    json_file = "/home/filipe/Desktop/Dissertação/" + args.job_name + ".json"
 
     if args.save_data:
         listener_ros_topics()
