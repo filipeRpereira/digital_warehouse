@@ -364,6 +364,7 @@ def read_json_data():
     return jsonData
 
 
+
 ## Colocar unidades nos gráficos
 def plot_data(json_data):
     total_frames = len(jsonData["frames"])

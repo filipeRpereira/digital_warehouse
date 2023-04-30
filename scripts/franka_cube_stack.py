@@ -30,6 +30,7 @@ import copy
 import numpy as np
 import os
 import torch
+import calendar
 
 import time
 
@@ -48,9 +49,9 @@ from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import MoveItErrorCodes
 
 
-#rospy.init_node("isaac_gym", anonymous=False)
-#joint_command_isaac = JointState()
-#pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
+rospy.init_node("isaac_gym", anonymous=False)
+joint_command_isaac = JointState()
+pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
 
 
 @torch.jit.script
@@ -166,8 +167,8 @@ class FrankaCubeStack(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
-            [0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device
-        )
+            #[0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
+            [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
 
         # OSC Gains
         self.kp = to_torch([150.] * 6, device=self.device)
@@ -509,6 +510,7 @@ class FrankaCubeStack(VecTask):
         self._q[env_ids, :] = pos
         self._qd[env_ids, :] = torch.zeros_like(self._qd[env_ids])
 
+
         # Set any position control to the current position, and any vel / effort control to be 0
         # NOTE: Task takes care of actually propagating these controls in sim using the SimActions API
         self._pos_control[env_ids, :] = pos
@@ -683,10 +685,13 @@ class FrankaCubeStack(VecTask):
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
 
+        self.get_joints_values(250)
+
     def post_physics_step(self):
         self.progress_buf += 1
 
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+
         if len(env_ids) > 0:
             self.reset_idx(env_ids)
 
@@ -724,16 +729,20 @@ class FrankaCubeStack(VecTask):
 
     def get_joints_values(self, env_num):
         positions = []
-        joint_0 = self._q[250][8].item()
-        print(joint_0)
+        velocity = []
+        joint_names = ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4',
+                       'panda_joint5', 'panda_joint6', 'panda_joint7',
+                       'panda_finger_joint1', 'panda_finger_joint2']
 
-        for i in range(8):
+        for i in range(7):
             joint_state_position = np.array(self._q[env_num][i].item())
-            #new_arr_pos = np.concatenate( (joint_state_position, [0, 0] ) )
             positions.append(joint_state_position)
+        for i in range(2):
+            gripper_state_position = np.array(self._gripper_control[env_num, i].item())
+            positions.append(gripper_state_position)
 
-
-        joint_command_isaac.position = np.concatenate( (positions, [0, 0] ) )
+        joint_command_isaac.name = joint_names
+        joint_command_isaac.position = positions
         pub.publish(joint_command_isaac)
 
 
@@ -836,24 +845,25 @@ def compute_franka_reward(
     # Compose rewards
     rewards = reward_settings["r_dist_scale"] * dist_reward + \
               reward_settings["r_lift_scale"] * lift_reward + \
-              reward_settings["r_align_scale"] * align_reward + \
-              cycle_time_new + \
-              0.3 * reward_torque_joint_0 * end_point + \
-              0.3 * reward_torque_joint_1 * end_point + \
-              0.2 * reward_torque_joint_2 * end_point + \
-              0.1 * reward_torque_joint_3 * end_point + \
-              0.05 * reward_torque_joint_4 * end_point + \
-              0.03 * reward_torque_joint_5 * end_point + \
-              0.02 * reward_torque_joint_6 * end_point
+              reward_settings["r_align_scale"] * align_reward #+ \
+              #cycle_time_new + \
+              #0.3 * reward_torque_joint_0 * end_point + \
+              #0.3 * reward_torque_joint_1 * end_point + \
+              #0.2 * reward_torque_joint_2 * end_point + \
+              #0.1 * reward_torque_joint_3 * end_point + \
+              #0.05 * reward_torque_joint_4 * end_point + \
+              #0.03 * reward_torque_joint_5 * end_point + \
+              #0.02 * reward_torque_joint_6 * end_point
 
     # We either provide the stack reward or the align + dist reward
     rewards = torch.where(stack_reward, reward_settings["r_stack_scale"] * stack_reward, rewards)
-    #'''
+    '''
     print("progress_buf   : ", progress_buf[250])
     print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[250].item())
     print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[250].item())
     print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[250].item())
     print("cycle_time_new : ", cycle_time_new[250].item())
+    '''
     '''
     print("torque_joint_0 : ", (0.3 * reward_torque_joint_0[250] * end_point[250]).item())
     print("torque_joint_1 : ", (0.3 * reward_torque_joint_1[250] * end_point[250]).item())
