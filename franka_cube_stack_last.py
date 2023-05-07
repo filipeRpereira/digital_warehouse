@@ -799,17 +799,6 @@ def compute_franka_reward(
     fraka_id = 250
     # torque
     new_torque = abs(torque) + abs(effort_control)
-    '''
-    new_torque[:, 0] = torch.where(end_point, torque[:, 0],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 1] = torch.where(end_point, torque[:, 1],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 2] = torch.where(end_point, torque[:, 2],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 3] = torch.where(end_point, torque[:, 3],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 4] = torch.where(end_point, torque[:, 4],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 5] = torch.where(end_point, torque[:, 5],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 6] = torch.where(end_point, torque[:, 6],  new_torque[:, 0] / 10000.00)
-
-    '''
-
     new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
     new_torque[:, 2] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 2]), new_torque[:, 2])
@@ -818,20 +807,36 @@ def compute_franka_reward(
     new_torque[:, 5] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 5]), new_torque[:, 5])
     new_torque[:, 6] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 6]), new_torque[:, 6])
 
+    torque_joint_0 = new_torque[:, 0] / 10000.00
+    torque_joint_1 = new_torque[:, 1] / 10000.00
+    torque_joint_2 = new_torque[:, 2] / 10000.00
+    torque_joint_3 = new_torque[:, 3] / 10000.00
+    torque_joint_4 = new_torque[:, 4] / 10000.00
+    torque_joint_5 = new_torque[:, 5] / 1000.00
+    torque_joint_6 = new_torque[:, 6] / 100.00
 
-    reward_torque_joint_0 = 1 - (new_torque[:, 0] / 10000.00)
-    reward_torque_joint_1 = 1 - (new_torque[:, 1] / 10000.00)
-    reward_torque_joint_2 = 1 - (new_torque[:, 2] / 10000.00)
-    reward_torque_joint_3 = 1 - (new_torque[:, 3] / 10000.00)
-    reward_torque_joint_4 = 1 - (new_torque[:, 4] / 10000.00)
-    reward_torque_joint_5 = 1 - (new_torque[:, 5] / 10000.00)
-    reward_torque_joint_6 = 1 - (new_torque[:, 6] / 10000.00)
+    reward_torque_joint_0 = 1 - torque_joint_0
+    reward_torque_joint_1 = 1 - torque_joint_1
+    reward_torque_joint_2 = 1 - torque_joint_2
+    reward_torque_joint_3 = 1 - torque_joint_3
+    reward_torque_joint_4 = 1 - torque_joint_4
+    reward_torque_joint_5 = 1 - torque_joint_5
+    reward_torque_joint_6 = 1 - torque_joint_6
 
-
+    '''
+    print("---------------------------")
+    print("joint 0: ", new_torque[:, 0][fraka_id].item())
+    print("joint 1: ", new_torque[:, 1][fraka_id].item())
+    print("joint 2: ", new_torque[:, 2][fraka_id].item())
+    print("joint 3: ", new_torque[:, 3][fraka_id].item())
+    print("joint 4: ", new_torque[:, 4][fraka_id].item())
+    print("joint 5: ", new_torque[:, 5][fraka_id].item())
+    print("joint 6: ", new_torque[:, 6][fraka_id].item())
+    '''
 
     # Metrics
-    torque_total_metric = new_torque[:, 0] + new_torque[:, 1] +new_torque[:, 2] +new_torque[:, 3] +new_torque[:, 4] + \
-                          new_torque[:, 5] + new_torque[:, 6]
+    torque_total_metric = (torque_joint_0 + torque_joint_1 + torque_joint_2 + torque_joint_3 + torque_joint_4 + \
+                   torque_joint_5 + torque_joint_6) * end_point
 
     # check cube b position
     cubeB_in_position = (abs(states["cubeB_pos"][:, 2] - states["cubeB_initial_pos"][:, 2]) < 0.015)

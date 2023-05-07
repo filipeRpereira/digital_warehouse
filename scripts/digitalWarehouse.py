@@ -1,1005 +1,888 @@
-#!/usr/bin/env python
-
-# Software License Agreement (BSD License)
-#
-# Copyright (c) 2013, SRI International
+# Copyright (c) 2021-2023, NVIDIA Corporation
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
+# modification, are permitted provided that the following conditions are met:
 #
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above
-#    copyright notice, this list of conditions and the following
-#    disclaimer in the documentation and/or other materials provided
-#    with the distribution.
-#  * Neither the name of SRI International nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission.
+# 1. Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
 #
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
 #
-# Author: Acorn Pooley, Mike Lautman
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+import copy
 
-## BEGIN_SUB_TUTORIAL imports
-##
-## To use the Python MoveIt interfaces, we will import the `moveit_commander`_ namespace.
-## This namespace provides us with a `MoveGroupCommander`_ class, a `PlanningSceneInterface`_ class,
-## and a `RobotCommander`_ class. More on these below. We also import `rospy`_ and some messages that we will use:
-##
+import numpy as np
+import os
+import torch
+import calendar
 
-# Python 2/3 compatibility imports
-from __future__ import print_function
-from six.moves import input
 import time
 
-import sys
-import copy
+from isaacgym import gymtorch
+from isaacgym import gymapi
+from isaacgym.torch_utils import *
+
+from isaacgymenvs.utils.torch_jit_utils import *
+from isaacgymenvs.tasks.base.vec_task import VecTask
+
 import rospy
-import moveit_commander
-import moveit_msgs.msg
-import geometry_msgs.msg
 
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 from moveit_msgs.msg import Grasp
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from moveit_msgs.msg import MoveItErrorCodes
-import numpy as np
-
-try:
-    from math import pi, tau, dist, fabs, cos
-except:  # For Python 2 compatibility
-    from math import pi, fabs, cos, sqrt
-
-    tau = 2.0 * pi
-
-    def dist(p, q):
-        return sqrt(sum((p_i - q_i) ** 2.0 for p_i, q_i in zip(p, q)))
-
-moveit_error_dict = {}
-for name in MoveItErrorCodes.__dict__.keys():
-    if not name[:1] == '_':
-        code = MoveItErrorCodes.__dict__[name]
-        moveit_error_dict[code] = name
-
-from moveit_commander.conversions import pose_to_list
-
-moveit_commander.roscpp_initialize(sys.argv)
-rospy.init_node("move_group_python_interface_tutorial", anonymous=False)
-
-#pub = rospy.Publisher("/joint_command", JointState, queue_size=20)
-joint_command_isaac = JointState()
-
-pub_gripper = rospy.Publisher("/gripper_command", Grasp, queue_size=20)
-
-positions = []
-velocities = []
-accelerations = []
 
 
-def all_close(goal, actual, tolerance):
+#rospy.init_node("isaac_gym", anonymous=False)
+#joint_command_isaac = JointState()
+#pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
+
+@torch.jit.script
+def axisangle2quat(vec, eps=1e-6):
     """
-    Convenience method for testing if the values in two lists are within a tolerance of each other.
-    For Pose and PoseStamped inputs, the angle between the two quaternions is compared (the angle
-    between the identical orientations q and -q is calculated correctly).
-    @param: goal       A list of floats, a Pose or a PoseStamped
-    @param: actual     A list of floats, a Pose or a PoseStamped
-    @param: tolerance  A float
-    @returns: bool
+    Converts scaled axis-angle to quat.
+    Args:
+        vec (tensor): (..., 3) tensor where final dim is (ax,ay,az) axis-angle exponential coordinates
+        eps (float): Stability value below which small values will be mapped to 0
+
+    Returns:
+        tensor: (..., 4) tensor where final dim is (x,y,z,w) vec4 float quaternion
     """
-    if type(goal) is list:
-        for index in range(len(goal)):
-            if abs(actual[index] - goal[index]) > tolerance:
-                return False
+    # type: (Tensor, float) -> Tensor
+    # store input shape and reshape
+    input_shape = vec.shape[:-1]
+    vec = vec.reshape(-1, 3)
 
-    elif type(goal) is geometry_msgs.msg.PoseStamped:
-        return all_close(goal.pose, actual.pose, tolerance)
+    # Grab angle
+    angle = torch.norm(vec, dim=-1, keepdim=True)
 
-    elif type(goal) is geometry_msgs.msg.Pose:
-        x0, y0, z0, qx0, qy0, qz0, qw0 = pose_to_list(actual)
-        x1, y1, z1, qx1, qy1, qz1, qw1 = pose_to_list(goal)
-        # Euclidean distance
-        d = dist((x1, y1, z1), (x0, y0, z0))
-        # phi = angle between orientations
-        cos_phi_half = fabs(qx0 * qx1 + qy0 * qy1 + qz0 * qz1 + qw0 * qw1)
-        return d <= tolerance and cos_phi_half >= cos(tolerance / 2.0)
+    # Create return array
+    quat = torch.zeros(torch.prod(torch.tensor(input_shape)), 4, device=vec.device)
+    quat[:, 3] = 1.0
 
-    return True
+    # Grab indexes where angle is not zero an convert the input to its quaternion form
+    idx = angle.reshape(-1) > eps
+    quat[idx, :] = torch.cat([
+        vec[idx, :] * torch.sin(angle[idx, :] / 2.0) / angle[idx, :],
+        torch.cos(angle[idx, :] / 2.0)
+    ], dim=-1)
+
+    # Reshape and return output
+    quat = quat.reshape(list(input_shape) + [4, ])
+    return quat
 
 
-class MoveGroupPythonInterfaceTutorial(object):
-    """MoveGroupPythonInterfaceTutorial"""
+class FrankaCubeStack(VecTask):
 
-    def __init__(self):
-        super(MoveGroupPythonInterfaceTutorial, self).__init__()
+    def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
+        self.cfg = cfg
+        self.cycle_time_max = torch.zeros(512).to('cuda')
+        self.torque_total = torch.zeros(512, 9).to('cuda')
 
-        ## Instantiate a `RobotCommander`_ object. Provides information such as the robot's
-        ## kinematic model and the robot's current joint states
-        robot = moveit_commander.RobotCommander()
+        self.max_episode_length = self.cfg["env"]["episodeLength"]
 
-        ## Instantiate a `PlanningSceneInterface`_ object.  This provides a remote interface
-        ## for getting, setting, and updating the robot's internal understanding of the
-        ## surrounding world:
-        scene = moveit_commander.PlanningSceneInterface()
+        self.action_scale = self.cfg["env"]["actionScale"]
+        self.start_position_noise = self.cfg["env"]["startPositionNoise"]
+        self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
+        self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
+        self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
+        self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+        self.aggregate_mode = self.cfg["env"]["aggregateMode"]
 
-        ## Instantiate a `MoveGroupCommander`_ object.  This object is an interface
-        ## to a planning group (group of joints).  In this tutorial the group is the primary
-        ## arm joints in the Panda robot, so we set the group's name to "panda_arm".
-        ## If you are using a different robot, change this value to the name of your robot
-        ## arm planning group.
-        ## This interface can be used to plan and execute motions:
-        #group_name = "panda_arm"
-        #group_name = "panda_hand"
-        group_name = "panda_arm"
-        move_group = moveit_commander.MoveGroupCommander(group_name)
+        # Create dicts to pass to reward function
+        self.reward_settings = {
+            "r_dist_scale": self.cfg["env"]["distRewardScale"],
+            "r_lift_scale": self.cfg["env"]["liftRewardScale"],
+            "r_align_scale": self.cfg["env"]["alignRewardScale"],
+            "r_stack_scale": self.cfg["env"]["stackRewardScale"],
+        }
 
-        ## Create a `DisplayTrajectory`_ ROS publisher which is used to display
-        ## trajectories in Rviz:
-        display_trajectory_publisher = rospy.Publisher(
-            "/move_group/display_planned_path",
-            moveit_msgs.msg.DisplayTrajectory,
-            queue_size=20,
+        # Controller type
+        self.control_type = self.cfg["env"]["controlType"]
+        assert self.control_type in {"osc", "joint_tor"}, \
+            "Invalid control type specified. Must be one of: {osc, joint_tor}"
+
+        # dimensions
+        # obs include: cubeA_pose (7) + cubeB_pos (3) + eef_pose (7) + q_gripper (2)
+        self.cfg["env"]["numObservations"] = 19 if self.control_type == "osc" else 26
+        # actions include: delta EEF if OSC (6) or joint torques (7) + bool gripper (1)
+        self.cfg["env"]["numActions"] = 7 if self.control_type == "osc" else 8
+
+        # Values to be filled in at runtime
+        self.states = {}  # will be dict filled with relevant states to use for reward calculation
+        self.handles = {}  # will be dict mapping names to relevant sim handles
+        self.num_dofs = None  # Total number of DOFs per env
+        self.actions = None  # Current actions to be deployed
+        self._init_cubeA_state = None  # Initial state of cubeA for the current env
+        self._init_cubeB_state = None  # Initial state of cubeB for the current env
+        self._cubeA_state = None  # Current state of cubeA for the current env
+        self._cubeB_state = None  # Current state of cubeB for the current env
+        self._cubeA_id = None  # Actor ID corresponding to cubeA for a given env
+        self._cubeB_id = None  # Actor ID corresponding to cubeB for a given env
+
+        # Tensor placeholders
+        self._root_state = None  # State of root body        (n_envs, 13)
+        self._dof_state = None  # State of all joints       (n_envs, n_dof)
+        self._q = None  # Joint positions           (n_envs, n_dof)
+        self._qd = None  # Joint velocities          (n_envs, n_dof)
+        self._rigid_body_state = None  # State of all rigid bodies             (n_envs, n_bodies, 13)
+        self._contact_forces = None  # Contact forces in sim
+        self._eef_state = None  # end effector state (at grasping point)
+        self._eef_lf_state = None  # end effector state (at left fingertip)
+        self._eef_rf_state = None  # end effector state (at left fingertip)
+        self._j_eef = None  # Jacobian for end effector
+        self._mm = None  # Mass matrix
+        self._arm_control = None  # Tensor buffer for controlling arm
+        self._gripper_control = None  # Tensor buffer for controlling gripper
+        self._pos_control = None  # Position actions
+        self._effort_control = None  # Torque actions
+        self._franka_effort_limits = None  # Actuator effort limits for franka
+        self._global_indices = None  # Unique indices corresponding to all envs in flattened array
+
+        self.debug_viz = self.cfg["env"]["enableDebugVis"]
+
+        self.up_axis = "z"
+        self.up_axis_idx = 2
+
+        super().__init__(config=self.cfg, rl_device=rl_device, sim_device=sim_device,
+                         graphics_device_id=graphics_device_id, headless=headless,
+                         virtual_screen_capture=virtual_screen_capture, force_render=force_render)
+
+        # Franka defaults
+        self.franka_default_dof_pos = to_torch(
+            #[0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
+            [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
+
+        # OSC Gains
+        self.kp = to_torch([150.] * 6, device=self.device)
+        self.kd = 2 * torch.sqrt(self.kp)
+        self.kp_null = to_torch([10.] * 7, device=self.device)
+        self.kd_null = 2 * torch.sqrt(self.kp_null)
+        # self.cmd_limit = None                   # filled in later
+
+        # Set control limits
+        self.cmd_limit = to_torch([0.1, 0.1, 0.1, 0.5, 0.5, 0.5], device=self.device).unsqueeze(0) if \
+            self.control_type == "osc" else self._franka_effort_limits[:7].unsqueeze(0)
+
+        # Reset all environments
+        self.reset_idx(torch.arange(self.num_envs, device=self.device))
+
+        # Refresh tensors
+        self._refresh()
+
+    def create_sim(self):
+        self.sim_params.up_axis = gymapi.UP_AXIS_Z
+        self.sim_params.gravity.x = 0
+        self.sim_params.gravity.y = 0
+        self.sim_params.gravity.z = -9.81
+        self.sim = super().create_sim(
+            self.device_id, self.graphics_device_id, self.physics_engine, self.sim_params)
+        self._create_ground_plane()
+        self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
+
+    def _create_ground_plane(self):
+        plane_params = gymapi.PlaneParams()
+        plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
+        self.gym.add_ground(self.sim, plane_params)
+
+    def _create_envs(self, num_envs, spacing, num_per_row):
+        lower = gymapi.Vec3(-spacing, -spacing, 0.0)
+        upper = gymapi.Vec3(spacing, spacing, spacing)
+
+        asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
+        franka_asset_file = "urdf/franka_description/robots/franka_panda_gripper.urdf"
+
+        if "asset" in self.cfg["env"]:
+            asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      self.cfg["env"]["asset"].get("assetRoot", asset_root))
+            franka_asset_file = self.cfg["env"]["asset"].get("assetFileNameFranka", franka_asset_file)
+
+        # load franka asset
+        asset_options = gymapi.AssetOptions()
+        asset_options.flip_visual_attachments = True
+        asset_options.fix_base_link = True
+        asset_options.collapse_fixed_joints = False
+        asset_options.disable_gravity = True
+        asset_options.thickness = 0.001
+        asset_options.default_dof_drive_mode = gymapi.DOF_MODE_EFFORT
+        asset_options.use_mesh_materials = True
+        franka_asset = self.gym.load_asset(self.sim, asset_root, franka_asset_file, asset_options)
+
+        franka_dof_stiffness = to_torch([0, 0, 0, 0, 0, 0, 0, 5000., 5000.], dtype=torch.float, device=self.device)
+        franka_dof_damping = to_torch([0, 0, 0, 0, 0, 0, 0, 1.0e2, 1.0e2], dtype=torch.float, device=self.device)
+
+        # Create table asset
+        table_pos = [0.0, 0.0, 1.0]
+        table_thickness = 0.05
+        table_opts = gymapi.AssetOptions()
+        table_opts.fix_base_link = True
+        table_asset = self.gym.create_box(self.sim, *[1.2, 1.2, table_thickness], table_opts)
+
+        # Create table stand asset
+        table_stand_height = 0.1
+        table_stand_pos = [-0.5, 0.0, 1.0 + table_thickness / 2 + table_stand_height / 2]
+        table_stand_opts = gymapi.AssetOptions()
+        table_stand_opts.fix_base_link = True
+        table_stand_asset = self.gym.create_box(self.sim, *[0.2, 0.2, table_stand_height], table_opts)
+
+        self.cubeA_size = 0.050
+        self.cubeB_size = 0.070
+        # self.cubeB_size = 0.200
+
+        # Create cubeA asset
+        cubeA_opts = gymapi.AssetOptions()
+        cubeA_asset = self.gym.create_box(self.sim, *([self.cubeA_size] * 3), cubeA_opts)
+        cubeA_color = gymapi.Vec3(0.6, 0.1, 0.0)
+
+        # Create cubeB asset
+        cubeB_opts = gymapi.AssetOptions()
+        cubeB_asset = self.gym.create_box(self.sim, *([self.cubeB_size] * 3), cubeB_opts)
+        # cubeB_asset = self.gym.create_box(self.sim, *([0.05, 0.05, self.cubeB_size]), cubeB_opts)
+        cubeB_color = gymapi.Vec3(0.0, 0.4, 0.1)
+
+        self.num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
+        self.num_franka_dofs = self.gym.get_asset_dof_count(franka_asset)
+
+        print("num franka bodies: ", self.num_franka_bodies)
+        print("num franka dofs: ", self.num_franka_dofs)
+
+        # set franka dof properties
+        franka_dof_props = self.gym.get_asset_dof_properties(franka_asset)
+        self.franka_dof_lower_limits = []
+        self.franka_dof_upper_limits = []
+        self._franka_effort_limits = []
+        for i in range(self.num_franka_dofs):
+            franka_dof_props['driveMode'][i] = gymapi.DOF_MODE_POS if i > 6 else gymapi.DOF_MODE_EFFORT
+            if self.physics_engine == gymapi.SIM_PHYSX:
+                franka_dof_props['stiffness'][i] = franka_dof_stiffness[i]
+                franka_dof_props['damping'][i] = franka_dof_damping[i]
+            else:
+                franka_dof_props['stiffness'][i] = 7000.0
+                franka_dof_props['damping'][i] = 50.0
+
+            self.franka_dof_lower_limits.append(franka_dof_props['lower'][i])
+            self.franka_dof_upper_limits.append(franka_dof_props['upper'][i])
+            self._franka_effort_limits.append(franka_dof_props['effort'][i])
+
+        self.franka_dof_lower_limits = to_torch(self.franka_dof_lower_limits, device=self.device)
+        self.franka_dof_upper_limits = to_torch(self.franka_dof_upper_limits, device=self.device)
+        self._franka_effort_limits = to_torch(self._franka_effort_limits, device=self.device)
+        self.franka_dof_speed_scales = torch.ones_like(self.franka_dof_lower_limits)
+        self.franka_dof_speed_scales[[7, 8]] = 0.1
+        franka_dof_props['effort'][7] = 200
+        franka_dof_props['effort'][8] = 200
+
+        # Define start pose for franka
+        franka_start_pose = gymapi.Transform()
+        franka_start_pose.p = gymapi.Vec3(-0.45, 0.0, 1.0 + table_thickness / 2 + table_stand_height)
+        franka_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+        # Define start pose for table
+        table_start_pose = gymapi.Transform()
+        table_start_pose.p = gymapi.Vec3(*table_pos)
+        table_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+        self._table_surface_pos = np.array(table_pos) + np.array([0, 0, table_thickness / 2])
+        self.reward_settings["table_height"] = self._table_surface_pos[2]
+
+        # Define start pose for table stand
+        table_stand_start_pose = gymapi.Transform()
+        table_stand_start_pose.p = gymapi.Vec3(*table_stand_pos)
+        table_stand_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+        # Define start pose for cubes (doesn't really matter since they're get overridden during reset() anyways)
+        cubeA_start_pose = gymapi.Transform()
+        cubeA_start_pose.p = gymapi.Vec3(0.1, 0.1, 0.0)
+        cubeA_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+        cubeB_start_pose = gymapi.Transform()
+        cubeB_start_pose.p = gymapi.Vec3(0.2, -0.3, 0.0)
+        cubeB_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
+        # compute aggregate size
+        num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
+        num_franka_shapes = self.gym.get_asset_rigid_shape_count(franka_asset)
+        max_agg_bodies = num_franka_bodies + 4  # 1 for table, table stand, cubeA, cubeB
+        max_agg_shapes = num_franka_shapes + 4  # 1 for table, table stand, cubeA, cubeB
+
+        self.frankas = []
+        self.envs = []
+
+        # Create environments
+        for i in range(self.num_envs):
+            # create env instance
+            env_ptr = self.gym.create_env(self.sim, lower, upper, num_per_row)
+
+            # Create actors and define aggregate group appropriately depending on setting
+            # NOTE: franka should ALWAYS be loaded first in sim!
+            if self.aggregate_mode >= 3:
+                self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
+
+            # Create franka
+            # Potentially randomize start pose
+            if self.franka_position_noise > 0:
+                rand_xy = self.franka_position_noise * (-1. + np.random.rand(2) * 2.0)
+                franka_start_pose.p = gymapi.Vec3(-0.45 + rand_xy[0], 0.0 + rand_xy[1],
+                                                  1.0 + table_thickness / 2 + table_stand_height)
+            if self.franka_rotation_noise > 0:
+                rand_rot = torch.zeros(1, 3)
+                rand_rot[:, -1] = self.franka_rotation_noise * (-1. + np.random.rand() * 2.0)
+                new_quat = axisangle2quat(rand_rot).squeeze().numpy().tolist()
+                franka_start_pose.r = gymapi.Quat(*new_quat)
+            franka_actor = self.gym.create_actor(env_ptr, franka_asset, franka_start_pose, "franka", i, 0, 0)
+            self.gym.set_actor_dof_properties(env_ptr, franka_actor, franka_dof_props)
+
+            if self.aggregate_mode == 2:
+                self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
+
+            # Create table
+            table_actor = self.gym.create_actor(env_ptr, table_asset, table_start_pose, "table", i, 1, 0)
+            table_stand_actor = self.gym.create_actor(env_ptr, table_stand_asset, table_stand_start_pose, "table_stand",
+                                                      i, 1, 0)
+
+            if self.aggregate_mode == 1:
+                self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
+
+            # Create cubes
+            self._cubeA_id = self.gym.create_actor(env_ptr, cubeA_asset, cubeA_start_pose, "cubeA", i, 2, 0)
+            self._cubeB_id = self.gym.create_actor(env_ptr, cubeB_asset, cubeB_start_pose, "cubeB", i, 4, 0)
+            # Set colors
+            self.gym.set_rigid_body_color(env_ptr, self._cubeA_id, 0, gymapi.MESH_VISUAL, cubeA_color)
+            self.gym.set_rigid_body_color(env_ptr, self._cubeB_id, 0, gymapi.MESH_VISUAL, cubeB_color)
+
+            if self.aggregate_mode > 0:
+                self.gym.end_aggregate(env_ptr)
+
+            # Store the created env pointers
+            self.envs.append(env_ptr)
+            self.frankas.append(franka_actor)
+
+        # Setup init state buffer
+        self._init_cubeA_state = torch.zeros(self.num_envs, 13, device=self.device)
+        self._init_cubeB_state = torch.zeros(self.num_envs, 13, device=self.device)
+
+        # Setup data
+        self.init_data()
+
+    def init_data(self):
+        # Setup sim handles
+        env_ptr = self.envs[0]
+        franka_handle = 0
+        self.handles = {
+            # Franka
+            "hand": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_hand"),
+            "leftfinger_tip": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_leftfinger_tip"),
+            "rightfinger_tip": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_rightfinger_tip"),
+            "grip_site": self.gym.find_actor_rigid_body_handle(env_ptr, franka_handle, "panda_grip_site"),
+            # Cubes
+            "cubeA_body_handle": self.gym.find_actor_rigid_body_handle(self.envs[0], self._cubeA_id, "box"),
+            "cubeB_body_handle": self.gym.find_actor_rigid_body_handle(self.envs[0], self._cubeB_id, "box"),
+        }
+
+        # Get total DOFs
+        self.num_dofs = self.gym.get_sim_dof_count(self.sim) // self.num_envs
+
+        # Setup tensor buffers
+        _actor_root_state_tensor = self.gym.acquire_actor_root_state_tensor(self.sim)
+        _dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
+        _rigid_body_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim)
+        self._root_state = gymtorch.wrap_tensor(_actor_root_state_tensor).view(self.num_envs, -1, 13)
+        self._dof_state = gymtorch.wrap_tensor(_dof_state_tensor).view(self.num_envs, -1, 2)
+        self._rigid_body_state = gymtorch.wrap_tensor(_rigid_body_state_tensor).view(self.num_envs, -1, 13)
+        self._q = self._dof_state[..., 0]
+        self._qd = self._dof_state[..., 1]
+        self._eef_state = self._rigid_body_state[:, self.handles["grip_site"], :]
+        self._eef_lf_state = self._rigid_body_state[:, self.handles["leftfinger_tip"], :]
+        self._eef_rf_state = self._rigid_body_state[:, self.handles["rightfinger_tip"], :]
+        _jacobian = self.gym.acquire_jacobian_tensor(self.sim, "franka")
+        jacobian = gymtorch.wrap_tensor(_jacobian)
+        hand_joint_index = self.gym.get_actor_joint_dict(env_ptr, franka_handle)['panda_hand_joint']
+        self._j_eef = jacobian[:, hand_joint_index, :, :7]
+        _massmatrix = self.gym.acquire_mass_matrix_tensor(self.sim, "franka")
+        mm = gymtorch.wrap_tensor(_massmatrix)
+        self._mm = mm[:, :7, :7]
+        self._cubeA_state = self._root_state[:, self._cubeA_id, :]
+        self._cubeB_state = self._root_state[:, self._cubeB_id, :]
+
+        # Initialize states
+        self.states.update({
+            "cubeA_size": torch.ones_like(self._eef_state[:, 0]) * self.cubeA_size,
+            "cubeB_size": torch.ones_like(self._eef_state[:, 0]) * self.cubeB_size,
+        })
+
+        # Initialize actions
+        self._pos_control = torch.zeros((self.num_envs, self.num_dofs), dtype=torch.float, device=self.device)
+        self._effort_control = torch.zeros_like(self._pos_control)
+
+        # Initialize control
+        self._arm_control = self._effort_control[:, :7]
+        self._gripper_control = self._pos_control[:, 7:9]
+
+        # Initialize indices
+        self._global_indices = torch.arange(self.num_envs * 5, dtype=torch.int32,
+                                            device=self.device).view(self.num_envs, -1)
+
+    def _update_states(self):
+        self.states.update({
+            # Franka
+            "q": self._q[:, :],
+            "q_gripper": self._q[:, -2:],
+            "eef_pos": self._eef_state[:, :3],
+            "eef_quat": self._eef_state[:, 3:7],
+            "eef_vel": self._eef_state[:, 7:],
+            "eef_lf_pos": self._eef_lf_state[:, :3],
+            "eef_rf_pos": self._eef_rf_state[:, :3],
+            # Cubes
+            "cubeA_quat": self._cubeA_state[:, 3:7],
+            "cubeA_pos": self._cubeA_state[:, :3],
+            "cubeA_pos_relative": self._cubeA_state[:, :3] - self._eef_state[:, :3],
+            "cubeB_quat": self._cubeB_state[:, 3:7],
+            "cubeB_pos": self._cubeB_state[:, :3],
+            "cubeA_to_cubeB_pos": self._cubeB_state[:, :3] - self._cubeA_state[:, :3],
+        })
+
+    def _refresh(self):
+        self.gym.refresh_actor_root_state_tensor(self.sim)
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_rigid_body_state_tensor(self.sim)
+        self.gym.refresh_jacobian_tensors(self.sim)
+        self.gym.refresh_mass_matrix_tensors(self.sim)
+
+        # Refresh states
+        self._update_states()
+
+    def compute_reward(self, actions):
+        self.rew_buf[:], self.reset_buf[:], self.cycle_time_max, self.torque_total = compute_franka_reward(
+            self.reset_buf, self.progress_buf, self.actions, self.states,
+            self.reward_settings, self.max_episode_length, self.cycle_time_max,
+            self.torque_total, self._effort_control
         )
 
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^
-        # We can get the name of the reference frame for this robot:
-        planning_frame = move_group.get_planning_frame()
-        print("============ Planning frame: %s" % planning_frame)
+    def compute_observations(self):
+        self._refresh()
+        obs = ["cubeA_quat", "cubeA_pos", "cubeA_to_cubeB_pos", "eef_pos", "eef_quat"]
+        obs += ["q_gripper"] if self.control_type == "osc" else ["q"]
+        self.obs_buf = torch.cat([self.states[ob] for ob in obs], dim=-1)
 
-        # We can also print the name of the end-effector link for this group:
-        eef_link = move_group.get_end_effector_link()
-        print("============ End effector link: %s" % eef_link)
+        maxs = {ob: torch.max(self.states[ob]).item() for ob in obs}
 
-        # We can get a list of all the groups in the robot:
-        group_names = robot.get_group_names()
-        print("============ Available Planning Groups:", robot.get_group_names())
+        return self.obs_buf
 
-        # Misc variables
-        self.box_name = ""
-        self.robot = robot
-        self.scene = scene
-        self.move_group = move_group
-        self.display_trajectory_publisher = display_trajectory_publisher
-        self.planning_frame = planning_frame
-        self.eef_link = eef_link
-        self.group_names = group_names
-        self.group_name = group_name
+    def reset_idx(self, env_ids):
+        env_ids_int32 = env_ids.to(dtype=torch.int32)
 
-        joint_goal = self.move_group.get_current_joint_values()
-        print("============ Panda Joints:")
-        print(joint_goal)
-        print("---------------------------")
+        # Reset cubes, sampling cube B first, then A
+        # if not self._i:
+        self._reset_init_cube_state(cube='B', env_ids=env_ids, check_valid=True)
+        self._reset_init_cube_state(cube='A', env_ids=env_ids, check_valid=False)
+        # self._i = True
 
+        # Write these new init states to the sim states
+        self._cubeA_state[env_ids] = self._init_cubeA_state[env_ids]
+        self._cubeB_state[env_ids] = self._init_cubeB_state[env_ids]
 
-    def go_to_joint_state(self):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        move_group = self.move_group
+        # Reset agent
+        reset_noise = torch.rand((len(env_ids), 9), device=self.device)
+        pos = tensor_clamp(
+            self.franka_default_dof_pos.unsqueeze(0) +
+            self.franka_dof_noise * 2.0 * (reset_noise - 0.5),
+            self.franka_dof_lower_limits.unsqueeze(0), self.franka_dof_upper_limits)
 
-        joint_goal = move_group.get_current_joint_values()
+        # Overwrite gripper init pos (no noise since these are always position controlled)
+        pos[:, -2:] = self.franka_default_dof_pos[-2:]
 
-
-        joint_goal[0] = 0
-        joint_goal[1] = -tau / 8
-        joint_goal[2] = 0
-        joint_goal[3] = -tau / 4
-        joint_goal[4] = 0
-        joint_goal[5] = tau / 6  # 1/6 of a turn
-        joint_goal[6] = 0
-
-        ## The go command can be called with joint values, poses, or without any
-        ## parameters if you have already set the pose or joint target for the group
-        move_group.plan()
-
-        move_group.set_planning_time(10)
-        move_group.set_max_velocity_scaling_factor(1.0)
-        move_group.set_max_acceleration_scaling_factor(1.0)
-
-        move_group.go(joint_goal, wait=True)
-
-        ## Calling ``stop()`` ensures that there is no residual movement
-        #move_group.stop()
-
-        ## END_SUB_TUTORIAL
-
-        ## For testing:
-        current_joints = move_group.get_current_joint_values()
-
-        #new_arr_pos = np.concatenate( (current_joints, [0.2, 0.2] ) )
-        #joint_command_isaac.position = new_arr_pos    
-        #pub.publish(joint_command_isaac)
-
-        print(self.move_group.get_current_pose().pose)
+        # Reset the internal obs accordingly
+        self._q[env_ids, :] = pos
+        self._qd[env_ids, :] = torch.zeros_like(self._qd[env_ids])
 
 
+        # Set any position control to the current position, and any vel / effort control to be 0
+        # NOTE: Task takes care of actually propagating these controls in sim using the SimActions API
+        self._pos_control[env_ids, :] = pos
+        self._effort_control[env_ids, :] = torch.zeros_like(pos)
 
-    
-        return all_close(joint_goal, current_joints, 0.01)
+        # Deploy updates
+        multi_env_ids_int32 = self._global_indices[env_ids, 0].flatten()
+        self.gym.set_dof_position_target_tensor_indexed(self.sim,
+                                                        gymtorch.unwrap_tensor(self._pos_control),
+                                                        gymtorch.unwrap_tensor(multi_env_ids_int32),
+                                                        len(multi_env_ids_int32))
+        self.gym.set_dof_actuation_force_tensor_indexed(self.sim,
+                                                        gymtorch.unwrap_tensor(self._effort_control),
+                                                        gymtorch.unwrap_tensor(multi_env_ids_int32),
+                                                        len(multi_env_ids_int32))
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self._dof_state),
+                                              gymtorch.unwrap_tensor(multi_env_ids_int32),
+                                              len(multi_env_ids_int32))
+
+        # Update cube states
+        multi_env_ids_cubes_int32 = self._global_indices[env_ids, -2:].flatten()
+        self.gym.set_actor_root_state_tensor_indexed(
+            self.sim, gymtorch.unwrap_tensor(self._root_state),
+            gymtorch.unwrap_tensor(multi_env_ids_cubes_int32), len(multi_env_ids_cubes_int32))
+
+        self.progress_buf[env_ids] = 0
+        self.reset_buf[env_ids] = 0
+
+    def _reset_init_cube_state(self, cube, env_ids, check_valid=True):
+        """
+        Simple method to sample @cube's position based on self.startPositionNoise and self.startRotationNoise, and
+        automaticlly reset the pose internally. Populates the appropriate self._init_cubeX_state
+
+        If @check_valid is True, then this will also make sure that the sampled position is not in contact with the
+        other cube.
+
+        Args:
+            cube(str): Which cube to sample location for. Either 'A' or 'B'
+            env_ids (tensor or None): Specific environments to reset cube for
+            check_valid (bool): Whether to make sure sampled position is collision-free with the other cube.
+        """
+        # If env_ids is None, we reset all the envs
+        if env_ids is None:
+            env_ids = torch.arange(start=0, end=self.num_envs, device=self.device, dtype=torch.long)
+
+        # Initialize buffer to hold sampled values
+        num_resets = len(env_ids)
+        sampled_cube_state = torch.zeros(num_resets, 13, device=self.device)
+
+        # Get correct references depending on which one was selected
+        if cube.lower() == 'a':
+            this_cube_state_all = self._init_cubeA_state
+            other_cube_state = self._init_cubeB_state[env_ids, :]
+            cube_heights = self.states["cubeA_size"]
+            centered_cube_xy_state = torch.tensor([0.1, 0.1], device=self.device, dtype=torch.float32)
+            # sampled_cube_state[:, 0] = 0.1
+            # sampled_cube_state[:, 1] = 0.1
+        elif cube.lower() == 'b':
+            this_cube_state_all = self._init_cubeB_state
+            other_cube_state = self._init_cubeA_state[env_ids, :]
+            cube_heights = self.states["cubeA_size"]
+            centered_cube_xy_state = torch.tensor([0.2, -0.3], device=self.device, dtype=torch.float32)
+            # sampled_cube_state[:, 0] = 0.2
+            # sampled_cube_state[:, 1] = -0.3
+        else:
+            raise ValueError(f"Invalid cube specified, options are 'A' and 'B'; got: {cube}")
+
+        # Minimum cube distance for guarenteed collision-free sampling is the sum of each cube's effective radius
+        min_dists = (self.states["cubeA_size"] + self.states["cubeB_size"])[env_ids] * np.sqrt(2) / 2.0
+
+        # We scale the min dist by 2 so that the cubes aren't too close together
+        min_dists = 0.2  # min_dists * 2.0
+
+        # Set z value, which is fixed height
+        sampled_cube_state[:, 2] = self._table_surface_pos[2] + cube_heights.squeeze(-1)[env_ids] / 2
+
+        # Initialize rotation, which is no rotation (quat w = 1)
+        sampled_cube_state[:, 6] = 1.0
+
+        # '''
+        # If we're verifying valid sampling, we need to check and re-sample if any are not collision-free
+        # We use a simple heuristic of checking based on cubes' radius to determine if a collision would occur
+        if check_valid:
+            success = False
+            # Indexes corresponding to envs we're still actively sampling for
+            active_idx = torch.arange(num_resets, device=self.device)
+            num_active_idx = len(active_idx)
+            for i in range(100):
+                # Sample x y values
+                sampled_cube_state[active_idx, :2] = centered_cube_xy_state + \
+                                                     2.0 * self.start_position_noise * (
+                                                             torch.rand_like(sampled_cube_state[active_idx, :2]) - 0.5)
+                # Check if sampled values are valid
+                cube_dist = torch.linalg.norm(sampled_cube_state[:, :2] - other_cube_state[:, :2], dim=-1)
+                active_idx = torch.nonzero(cube_dist < min_dists, as_tuple=True)[0]
+                num_active_idx = len(active_idx)
+                # If active idx is empty, then all sampling is valid :D
+                if num_active_idx == 0:
+                    success = True
+                    break
+            # Make sure we succeeded at sampling
+            assert success, "Sampling cube locations was unsuccessful! ):"
+        else:
+            # We just directly sample
+            sampled_cube_state[:, :2] = centered_cube_xy_state.unsqueeze(0) + \
+                                        2.0 * self.start_position_noise * (
+                                                torch.rand(num_resets, 2, device=self.device) - 0.5)
+
+        # Sample rotation value
+        if self.start_rotation_noise > 0:
+            aa_rot = torch.zeros(num_resets, 3, device=self.device)
+            aa_rot[:, 2] = 2.0 * self.start_rotation_noise * (torch.rand(num_resets, device=self.device) - 0.5)
+            sampled_cube_state[:, 3:7] = quat_mul(axisangle2quat(aa_rot), sampled_cube_state[:, 3:7])
+        # '''
+        # Lastly, set these sampled values as the new init state
+        this_cube_state_all[env_ids, :] = sampled_cube_state
+
+    def _compute_osc_torques(self, dpose):
+        # Solve for Operational Space Control # Paper: khatib.stanford.edu/publications/pdfs/Khatib_1987_RA.pdf
+        # Helpful resource: studywolf.wordpress.com/2013/09/17/robot-control-4-operation-space-control/
+        q, qd = self._q[:, :7], self._qd[:, :7]
+        mm_inv = torch.inverse(self._mm)
+        m_eef_inv = self._j_eef @ mm_inv @ torch.transpose(self._j_eef, 1, 2)
+        m_eef = torch.inverse(m_eef_inv)
+
+        # Transform our cartesian action `dpose` into joint torques `u`
+        u = torch.transpose(self._j_eef, 1, 2) @ m_eef @ (
+                self.kp * dpose - self.kd * self.states["eef_vel"]).unsqueeze(-1)
+
+        # Nullspace control torques `u_null` prevents large changes in joint configuration
+        # They are added into the nullspace of OSC so that the end effector orientation remains constant
+        # roboticsproceedings.org/rss07/p31.pdf
+        j_eef_inv = m_eef @ self._j_eef @ mm_inv
+        u_null = self.kd_null * -qd + self.kp_null * (
+                (self.franka_default_dof_pos[:7] - q + np.pi) % (2 * np.pi) - np.pi)
+        u_null[:, 7:] *= 0
+        u_null = self._mm @ u_null.unsqueeze(-1)
+        u += (torch.eye(7, device=self.device).unsqueeze(0) - torch.transpose(self._j_eef, 1, 2) @ j_eef_inv) @ u_null
+
+        # Clip the values to be within valid effort range
+        u = tensor_clamp(u.squeeze(-1),
+                         -self._franka_effort_limits[:7].unsqueeze(0), self._franka_effort_limits[:7].unsqueeze(0))
+
+        return u
+
+    def pre_physics_step(self, actions):
+        self.actions = actions.clone().to(self.device)
+
+        # Split arm and gripper command
+        u_arm, u_gripper = self.actions[:, :-1], self.actions[:, -1]
+
+        #print(u_arm, u_gripper)
+        # print(self.cmd_limit, self.action_scale)
+
+        # Control arm (scale value first)
+        u_arm = u_arm * self.cmd_limit / self.action_scale
+        if self.control_type == "osc":
+            u_arm = self._compute_osc_torques(dpose=u_arm)
+        self._arm_control[:, :] = u_arm
+
+        # Control gripper
+        u_fingers = torch.zeros_like(self._gripper_control)
+        u_fingers[:, 0] = torch.where(u_gripper >= 0.0, self.franka_dof_upper_limits[-2].item(),
+                                      self.franka_dof_lower_limits[-2].item())
+        u_fingers[:, 1] = torch.where(u_gripper >= 0.0, self.franka_dof_upper_limits[-1].item(),
+                                      self.franka_dof_lower_limits[-1].item())
+        # Write gripper command to appropriate tensor buffer
+        self._gripper_control[:, :] = u_fingers
+
+        # Deploy actions
+        self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
+        self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
+
+        #self.get_joints_values(250)
+
+    def post_physics_step(self):
+        self.progress_buf += 1
+
+        env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
+
+        if len(env_ids) > 0:
+            self.reset_idx(env_ids)
+
+        self.compute_observations()
+        self.compute_reward(self.actions)
 
 
-    def go_to_pose_goal(self, x, y, z):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        move_group = self.move_group
+        # debug viz
+        if self.viewer and self.debug_viz:
+            self.gym.clear_lines(self.viewer)
+            self.gym.refresh_rigid_body_state_tensor(self.sim)
 
-        ## BEGIN_SUB_TUTORIAL plan_to_pose
-        ##
-        ## Planning to a Pose Goal
-        ## ^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can plan a motion for this group to a desired pose for the
-        ## end-effector:
-  
-        pose_goal = geometry_msgs.msg.Pose()
+            # Grab relevant states to visualize
+            eef_pos = self.states["eef_pos"]
+            eef_rot = self.states["eef_quat"]
+            cubeA_pos = self.states["cubeA_pos"]
+            cubeA_rot = self.states["cubeA_quat"]
+            cubeB_pos = self.states["cubeB_pos"]
+            cubeB_rot = self.states["cubeB_quat"]
 
-        pose_goal.position.x = x
-        pose_goal.position.y = y
-        pose_goal.position.z = z
-        
-        pose_goal.orientation.x = 0
-        pose_goal.orientation.y = 1
-        pose_goal.orientation.z = 0
-        pose_goal.orientation.w = 0
+            # Plot visualizations
+            for i in range(self.num_envs):
+                for pos, rot in zip((eef_pos, cubeA_pos, cubeB_pos), (eef_rot, cubeA_rot, cubeB_rot)):
+                    px = (pos[i] + quat_apply(rot[i], to_torch([1, 0, 0], device=self.device) * 0.2)).cpu().numpy()
+                    py = (pos[i] + quat_apply(rot[i], to_torch([0, 1, 0], device=self.device) * 0.2)).cpu().numpy()
+                    pz = (pos[i] + quat_apply(rot[i], to_torch([0, 0, 1], device=self.device) * 0.2)).cpu().numpy()
 
-        # X, Y, Z, W
-        #quat_tf = [0, 1, 0, 0]
-        #xyz = [x, y, z]
-        #print(quat_tf)
+                    p0 = pos[i].cpu().numpy()
+                    self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], px[0], px[1], px[2]],
+                                       [0.85, 0.1, 0.1])
+                    self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], py[0], py[1], py[2]],
+                                       [0.1, 0.85, 0.1])
+                    self.gym.add_lines(self.viewer, self.envs[i], 1, [p0[0], p0[1], p0[2], pz[0], pz[1], pz[2]],
+                                       [0.1, 0.1, 0.85])
 
-        move_group.set_planning_time(5)
-        move_group.set_max_velocity_scaling_factor(1.0)
-        move_group.set_max_acceleration_scaling_factor(1.0)
+    def get_joints_values(self, env_num):
+        positions = []
+        velocity = []
+        joint_names = ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4',
+                       'panda_joint5', 'panda_joint6', 'panda_joint7',
+                       'panda_finger_joint1', 'panda_finger_joint2']
 
-        #move_group.set_orientation_target(quat_tf, end_effector_link = "panda_hand")
-        move_group.set_pose_target(pose_goal, end_effector_link="panda_hand")
-        
+        for i in range(7):
+            joint_state_position = np.array(self._q[env_num][i].item())
+            positions.append(joint_state_position)
+        for i in range(2):
+            gripper_state_position = np.array(self._gripper_control[env_num, i].item())
+            positions.append(gripper_state_position)
 
-
-
-        ## Now, we call the planner to compute the plan and execute it.
-        ## `go()` returns a boolean indicating whether the planning and execution was successful.
-        success = move_group.go(wait=True)
-
-        ## Calling `stop()` ensures that there is no residual movement
-        move_group.stop()
-        ## It is always good to clear your targets after planning with poses.
-        ## Note: there is no equivalent function for clear_joint_value_targets().
-        move_group.clear_pose_targets()
-
-        ## END_SUB_TUTORIAL
-
-        ## For testing:
-        ## Note that since this section of code will not be included in the tutorials
-        ## we use the class variable rather than the copied state variable
-        current_pose = self.move_group.get_current_pose().pose
-
-        #print(self.move_group.get_current_pose().pose)
-
-
-
-        return all_close(pose_goal, current_pose, 0.01)
-
-
-    def go_to_pose_goal_old(self):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        move_group = self.move_group
-        poses_list = []
-
-        ## BEGIN_SUB_TUTORIAL plan_to_pose
-        ##
-        ## Planning to a Pose Goal
-        ## ^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can plan a motion for this group to a desired pose for the
-        ## end-effector:
-        pose_goal = geometry_msgs.msg.Pose()
-        pose_goal.orientation.w = -1.0
-        pose_goal.position.x = 0.4
-        pose_goal.position.y = 0.2
-        pose_goal.position.z = 0.4
-
-        move_group.set_pose_target(pose_goal)
-
-
-        ## Now, we call the planner to compute the plan and execute it.
-        ## `go()` returns a boolean indicating whether the planning and execution was successful.
-        success = move_group.go(wait=True)
-
-        ## Calling `stop()` ensures that there is no residual movement
-        move_group.stop()
-        ## It is always good to clear your targets after planning with poses.
-        ## Note: there is no equivalent function for clear_joint_value_targets().
-        move_group.clear_pose_targets()
-
-        ## END_SUB_TUTORIAL
-
-        ## For testing:
-        ## Note that since this section of code will not be included in the tutorials
-        ## we use the class variable rather than the copied state variable
-        current_pose = self.move_group.get_current_pose().pose
-        current_joint_values = self.move_group.get_current_joint_values()
-        #print("----------------------------------")
-        #print(current_joint_values)
-        
-        joint_command_isaac.position = np.concatenate( (current_joint_values, [0, 0] ) )    
+        joint_command_isaac.name = joint_names
+        joint_command_isaac.position = positions
         pub.publish(joint_command_isaac)
 
-        return all_close(pose_goal, current_pose, 0.01)
 
-
-    def plan_cartesian_path(self, scale=1):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        move_group = self.move_group
-
-        ## BEGIN_SUB_TUTORIAL plan_cartesian_path
-        ##
-        ## Cartesian Paths
-        ## ^^^^^^^^^^^^^^^
-        ## You can plan a Cartesian path directly by specifying a list of waypoints
-        ## for the end-effector to go through. If executing  interactively in a
-        ## Python shell, set scale = 1.0.
-        ##
-        waypoints = []
-
-        wpose = move_group.get_current_pose().pose
-        wpose.position.z -= scale * 0.2  # First move up (z)
-        wpose.position.y += scale * 0.2  # and sideways (y)
-        
-        waypoints.append(copy.deepcopy(wpose))
-
-        wpose.position.x += scale * 0.2  # Second move forward/backwards in (x)
-        waypoints.append(copy.deepcopy(wpose))
-
-        wpose.position.y -= scale * 0.2  # Third move sideways (y)
-        waypoints.append(copy.deepcopy(wpose))
-
-        wpose.position.x -= scale * 0.2  # Third move sideways (y)
-        waypoints.append(copy.deepcopy(wpose))
-
-        wpose.position.y -= scale * 0.2  # Third move sideways (y)
-        wpose.position.z += scale * -0.1  # and sideways (y)
-        waypoints.append(copy.deepcopy(wpose))
-       
-
-        # We want the Cartesian path to be interpolated at a resolution of 1 cm
-        # which is why we will specify 0.01 as the eef_step in Cartesian
-        # translation.  We will disable the jump threshold by setting it to 0.0,
-        # ignoring the check for infeasible jumps in joint space, which is sufficient
-        # for this tutorial.
-        (plan, fraction) = move_group.compute_cartesian_path(waypoints, 0.01, 0.0)
-
-        
-        num_joints = len(joint_command_isaac.name)
-        #joint_state_position = np.array([0.0] * num_joints)
-
-        for i in range(len(plan.joint_trajectory.points)):
-            joint_state_position = np.array(plan.joint_trajectory.points[i].positions)
-            new_arr_pos = np.concatenate( (joint_state_position, [0, 0] ) )
-            positions.append(new_arr_pos)
-
-            joint_state_velocity = np.array(plan.joint_trajectory.points[i].velocities)
-            new_arr_vel = np.concatenate( (joint_state_velocity, [0, 0] ) )
-            velocities.append(new_arr_vel)
-
-
-        # Note: We are just planning, not asking move_group to actually move the robot yet:
-        return plan, fraction
-
-
-    def display_trajectory(self, plan):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        robot = self.robot
-        display_trajectory_publisher = self.display_trajectory_publisher
-
-        ## BEGIN_SUB_TUTORIAL display_trajectory
-        ##
-        ## Displaying a Trajectory
-        ## ^^^^^^^^^^^^^^^^^^^^^^^
-        ## You can ask RViz to visualize a plan (aka trajectory) for you. But the
-        ## group.plan() method does this automatically so this is not that useful
-        ## here (it just displays the same trajectory again):
-        ##
-        ## A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
-        ## We populate the trajectory_start with our current robot state to copy over
-        ## any AttachedCollisionObjects and add our plan to the trajectory.
-        display_trajectory = moveit_msgs.msg.DisplayTrajectory()
-        display_trajectory.trajectory_start = robot.get_current_state()
-        display_trajectory.trajectory.append(plan)
-        # Publish
-        display_trajectory_publisher.publish(display_trajectory)
-
-
-    def execute_plan(self, plan):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        move_group = self.move_group
-
-        ## BEGIN_SUB_TUTORIAL execute_plan
-        ##
-        ## Executing a Plan
-        ## ^^^^^^^^^^^^^^^^
-        ## Use execute if you would like the robot to follow
-        ## the plan that has already been computed:
-        #move_group.set_max_velocity_scaling_factor(0.5)
-
-
-
-        rate = rospy.Rate(20)
-        for i in range(len(positions)):
-            joint_command_isaac.position = positions[i]
-            joint_command_isaac.velocity = velocities[i]
-            
-            pub.publish(joint_command_isaac)
-            rate.sleep()        
-
-
-        move_group.execute(plan, wait=True)
-
-
-    def wait_for_state_update(
-        self, box_is_known=False, box_is_attached=False, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        box_name = self.box_name
-        scene = self.scene
-
-        ## BEGIN_SUB_TUTORIAL wait_for_scene_update
-        ##
-        ## Ensuring Collision Updates Are Received
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## If the Python node was just created (https://github.com/ros/ros_comm/issues/176),
-        ## or dies before actually publishing the scene update message, the message
-        ## could get lost and the box will not appear. To ensure that the updates are
-        ## made, we wait until we see the changes reflected in the
-        ## ``get_attached_objects()`` and ``get_known_object_names()`` lists.
-        ## For the purpose of this tutorial, we call this function after adding,
-        ## removing, attaching or detaching an object in the planning scene. We then wait
-        ## until the updates have been made or ``timeout`` seconds have passed.
-        ## To avoid waiting for scene updates like this at all, initialize the
-        ## planning scene interface with  ``synchronous = True``.
-        start = rospy.get_time()
-        seconds = rospy.get_time()
-        while (seconds - start < timeout) and not rospy.is_shutdown():
-            # Test if the box is in attached objects
-            attached_objects = scene.get_attached_objects([box_name])
-            is_attached = len(attached_objects.keys()) > 0
-
-            # Test if the box is in the scene.
-            # Note that attaching the box will remove it from known_objects
-            is_known = box_name in scene.get_known_object_names()
-
-            # Test if we are in the expected state
-            if (box_is_attached == is_attached) and (box_is_known == is_known):
-                return True
-
-            # Sleep so that we give other threads time on the processor
-            rospy.sleep(0.1)
-            seconds = rospy.get_time()
-
-        # If we exited the while loop without returning then we timed out
-        return False
-
-
-    def add_table(self, timeout=4):
-            # Copy class variables to local variables to make the web tutorials more clear.
-            # In practice, you should use the class variables directly unless you have a good
-            # reason not to.
-            box_name = self.box_name
-            scene = self.scene
-
-            ## BEGIN_SUB_TUTORIAL add_box
-            ##
-            ## Adding Objects to the Planning Scene
-            ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            ## First, we will create a box in the planning scene between the fingers:
-            box_pose = geometry_msgs.msg.PoseStamped()
-            box_pose.header.frame_id = "panda_link0"
-
-
-            box_pose.pose.position.x = 0.5
-            box_pose.pose.position.y = 0
-            box_pose.pose.position.z = 0.025
-
-
-            box_name = "table"
-            scene.add_box(box_name, box_pose, size = (0.5, 0.5, 0.15))
-
-
-            ## END_SUB_TUTORIAL
-            # Copy local variables back to class variables. In practice, you should use the class
-            # variables directly unless you have a good reason not to.
-            self.box_name = box_name
-            return self.wait_for_state_update(box_is_known=True, timeout=timeout), box_pose
-
-
-    def add_table_placement(self, timeout=4):
-            # Copy class variables to local variables to make the web tutorials more clear.
-            # In practice, you should use the class variables directly unless you have a good
-            # reason not to.
-            box_name = self.box_name
-            scene = self.scene
-
-            ## BEGIN_SUB_TUTORIAL add_box
-            ##
-            ## Adding Objects to the Planning Scene
-            ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            ## First, we will create a box in the planning scene between the fingers:
-            box_pose = geometry_msgs.msg.PoseStamped()
-            box_pose.header.frame_id = "panda_link0"
-
-
-            box_pose.pose.position.x = -0.5
-            box_pose.pose.position.y = 0
-            box_pose.pose.position.z = 0.025
-
-
-            box_name = "table_placement"
-            scene.add_box(box_name, box_pose, size = (0.5, 0.5, 0.15))
-
-
-            ## END_SUB_TUTORIAL
-            # Copy local variables back to class variables. In practice, you should use the class
-            # variables directly unless you have a good reason not to.
-            self.box_name = box_name
-            return self.wait_for_state_update(box_is_known=True, timeout=timeout), box_pose
-
-
-    def add_box(self, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        box_name = self.box_name
-        scene = self.scene
-
-        ## BEGIN_SUB_TUTORIAL add_box
-        ##
-        ## Adding Objects to the Planning Scene
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## First, we will create a box in the planning scene between the fingers:
-        box_pose = geometry_msgs.msg.PoseStamped()
-        box_pose.header.frame_id = "panda_link0"
-
-        #box_pose.pose.orientation.x = 0.0
-        #box_pose.pose.orientation.y = 1.0
-        #box_pose.pose.orientation.z = 0.0
-        #box_pose.pose.orientation.w = 0.0
-
-
-        box_pose.pose.position.x = 0.6
-        box_pose.pose.position.y = 0
-        box_pose.pose.position.z = 0.125
-
-
-        box_name = "Cube"
-        scene.add_box(box_name, box_pose, size = (0.05, 0.05, 0.05))
-
-
-        ## END_SUB_TUTORIAL
-        # Copy local variables back to class variables. In practice, you should use the class
-        # variables directly unless you have a good reason not to.
-        self.box_name = box_name
-        return self.wait_for_state_update(box_is_known=True, timeout=timeout), box_pose
-
-
-    def pick_box(self, box):   
-        rospy.sleep(1)
-        rospy.logwarn("moving to test")
-        grasps = [] 
-        #0.67611; 0.0091003; 0.71731
-        g = Grasp()
-        g.id = "test"
-        
-        grasp_pose = PoseStamped()
-        grasp_pose.header.frame_id = "panda_link0"
-        grasp_pose.pose.position.x = box.pose.position.x
-        grasp_pose.pose.position.y = box.pose.position.y
-        grasp_pose.pose.position.z = box.pose.position.z + 0.1
-
-        grasp_pose.pose.orientation.x = 0
-        grasp_pose.pose.orientation.y = 1
-        grasp_pose.pose.orientation.z = 0
-        grasp_pose.pose.orientation.w = 0
-
-
-        rospy.logwarn("moving to arm")
-        move_group = self.move_group
-        
-        rospy.sleep(1)
-        
-        # set the grasp pose
-        g.grasp_pose = grasp_pose
-
-        # define the pre-grasp approach
-        g.pre_grasp_approach.direction.header.frame_id = "panda_link0"
-        g.pre_grasp_approach.direction.vector.x = box.pose.position.x #- 2.0
-        g.pre_grasp_approach.direction.vector.y = box.pose.position.y + 0.4
-        g.pre_grasp_approach.direction.vector.z = -box.pose.position.z - 0.2
-        g.pre_grasp_approach.min_distance = 0.1
-        g.pre_grasp_approach.desired_distance = 0.3
-        g.pre_grasp_posture.header.frame_id = "panda_link0"
-        g.pre_grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-    
-        pos = JointTrajectoryPoint()
-        pos.positions.append(0.06)
-    
-        g.pre_grasp_posture.points.append(pos)
-    
-        # set the grasp posture
-        g.grasp_posture.header.frame_id = "panda_link0"
-        g.grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-
-        pos = JointTrajectoryPoint()
-        pos.positions.append(0.0)
-        pos.effort.append(0.9)
-    
-        g.grasp_posture.points.append(pos)
-    
-        # set the post-grasp retreat
-        g.post_grasp_retreat.direction.header.frame_id = "panda_link0"
-        g.post_grasp_retreat.direction.vector.x = -0.4
-        g.post_grasp_retreat.direction.vector.y = 0.2
-        g.post_grasp_retreat.direction.vector.z = 0.7
-        g.post_grasp_retreat.desired_distance = 0.25
-        g.post_grasp_retreat.min_distance = 0.01
-
-        #g.allowed_touch_objects = ["table", "panda_hand", "Cube"]
-        g.allowed_touch_objects = ["table"]
-        
-        g.max_contact_force = 0.0
-        g.grasp_quality = 0.1     
-        
-        # append the grasp to the list of grasps
-        grasps.append(g)
-        
-        # pick the object
-        #move_group.pick("Cube", grasps)
-        result = False
-        n_attempts = 0
-           
-        ## repeat until will succeed
-        while result == False:
-            print("Attempts pickup: "), n_attempts
-            result = move_group.pick("Cube", grasps)      
-            n_attempts += 1
-            rospy.sleep(1)
-        rospy.loginfo("Pickup successful")
-
-        placement_pose = PoseStamped()
-        placement_pose.header.frame_id = "panda_link0"
-        placement_pose.pose.position.x = -0.5
-        placement_pose.pose.position.y = 0.0
-        placement_pose.pose.position.z = 0.2
-
-        placement_pose.pose.orientation.x = 0.0
-        placement_pose.pose.orientation.y = 0
-        placement_pose.pose.orientation.z = 1.
-        placement_pose.pose.orientation.w = 0
-
-        result1 = False
-        n_attempts1 = 0
-        while result1 == False:
-            print("Attempts place: "), n_attempts1
-            result1 = move_group.place("Cube", placement_pose)      
-            n_attempts1 += 1
-            rospy.sleep(0.2)
-        rospy.sleep(1)
-        rospy.loginfo("Placement successful")
-    
-
-    def pick_box_inverted(self, box):   
-        rospy.sleep(1)
-        rospy.logwarn("moving to test")
-        grasps = [] 
-        g = Grasp()
-        g.id = "test"
-        
-        grasp_pose = PoseStamped()
-        grasp_pose.header.frame_id = "panda_link0"
-
-        grasp_pose.pose.position.x = -0.4
-        grasp_pose.pose.position.y = 0.0
-        grasp_pose.pose.position.z = 0.2
-        
-        grasp_pose.pose.orientation.y = 1.0
-        grasp_pose.pose.orientation.z = 0
-        grasp_pose.pose.orientation.w = 0
-
-
-        rospy.logwarn("moving to arm")
-        move_group = self.move_group
-        
-        rospy.sleep(1)
-        
-        # set the grasp pose
-        g.grasp_pose = grasp_pose
-
-        # define the pre-grasp approach
-        g.pre_grasp_approach.direction.header.frame_id = "panda_link0"
-        #g.pre_grasp_approach.direction.vector.x = box.pose.position.x #- 2.0
-        #g.pre_grasp_approach.direction.vector.y = box.pose.position.y + 0.4
-        #g.pre_grasp_approach.direction.vector.z = -box.pose.position.z - 0.2
-        g.pre_grasp_approach.direction.vector.x = -0.5
-        g.pre_grasp_approach.direction.vector.y = 0.4
-        g.pre_grasp_approach.direction.vector.z = 0.235
-        g.pre_grasp_approach.min_distance = 0.1
-        g.pre_grasp_approach.desired_distance = 0.3
-        g.pre_grasp_posture.header.frame_id = "panda_link0"
-        g.pre_grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-
-        pos = JointTrajectoryPoint()
-        pos.positions.append(0.06)
-
-        g.pre_grasp_posture.points.append(pos)
-
-        # set the grasp posture
-        g.grasp_posture.header.frame_id = "panda_link0"
-        g.grasp_posture.joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-
-        pos = JointTrajectoryPoint()
-        pos.positions.append(0.0)
-        pos.effort.append(0.9)
-
-        g.grasp_posture.points.append(pos)
-
-        # set the post-grasp retreat
-        g.post_grasp_retreat.direction.header.frame_id = "panda_link0"
-        g.post_grasp_retreat.direction.vector.x = -0.4
-        g.post_grasp_retreat.direction.vector.y = 0.2
-        g.post_grasp_retreat.direction.vector.z = 0.7
-        g.post_grasp_retreat.desired_distance = 0.25
-        g.post_grasp_retreat.min_distance = 0.01
-
-        #g.allowed_touch_objects = ["table", "panda_hand", "Cube"]
-        g.allowed_touch_objects = ["table"]
-        
-        g.max_contact_force = 0.0
-        g.grasp_quality = 0.1     
-        
-        # append the grasp to the list of grasps
-        grasps.append(g)
-        
-        # pick the object
-        #move_group.pick("Cube", grasps)
-        result = False
-        n_attempts = 0
-            
-        ## repeat until will succeed
-        while result == False:
-            print("Attempts pickup: "), n_attempts
-            result = move_group.pick("Cube", grasps)      
-            n_attempts += 1
-            rospy.sleep(1)
-        rospy.loginfo("Pickup successful")
-
-        placement_pose = PoseStamped()
-        placement_pose.header.frame_id = "panda_link0"
-        placement_pose.pose.position.x = -0.5
-        placement_pose.pose.position.y = 0.0
-        placement_pose.pose.position.z = 0.125
-
-        placement_pose.pose.orientation.x = 0.0
-        placement_pose.pose.orientation.y = 0
-        placement_pose.pose.orientation.z = 1.0
-        placement_pose.pose.orientation.w = 0
-
-        result1 = False
-        n_attempts1 = 0
-        while result1 == False:
-            print("Attempts place: "), n_attempts1
-            result1 = move_group.place("Cube", placement_pose)      
-            n_attempts1 += 1
-            rospy.sleep(0.2)
-        rospy.sleep(1)
-        rospy.loginfo("Placement successful")
-    
-
-    def attach_box(self, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        box_name = self.box_name
-        robot = self.robot
-        scene = self.scene
-        eef_link = self.eef_link
-        group_names = self.group_names
-
-        ## BEGIN_SUB_TUTORIAL attach_object
-        ##
-        ## Attaching Objects to the Robot
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## Next, we will attach the box to the Panda wrist. Manipulating objects requires the
-        ## robot be able to touch them without the planning scene reporting the contact as a
-        ## collision. By adding link names to the ``touch_links`` array, we are telling the
-        ## planning scene to ignore collisions between those links and the box. For the Panda
-        ## robot, we set ``grasping_group = 'hand'``. If you are using a different robot,
-        ## you should change this value to the name of your end effector group name.
-        grasping_group = "panda_hand"
-        touch_links = robot.get_link_names(group=grasping_group)
-        scene.attach_box(eef_link, box_name, touch_links=touch_links)
-        ## END_SUB_TUTORIAL
-
-        # We wait for the planning scene to update.
-        return self.wait_for_state_update(
-            box_is_attached=True, box_is_known=False, timeout=timeout
-        )
-
-
-    def detach_box(self, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        box_name = self.box_name
-        scene = self.scene
-        eef_link = self.eef_link
-
-        ## BEGIN_SUB_TUTORIAL detach_object
-        ##
-        ## Detaching Objects from the Robot
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can also detach and remove the object from the planning scene:
-        scene.remove_attached_object(eef_link, name=box_name)
-        ## END_SUB_TUTORIAL
-
-        # We wait for the planning scene to update.
-        return self.wait_for_state_update(
-            box_is_known=True, box_is_attached=False, timeout=timeout
-        )
-
-
-    def remove_box(self, timeout=4):
-        # Copy class variables to local variables to make the web tutorials more clear.
-        # In practice, you should use the class variables directly unless you have a good
-        # reason not to.
-        box_name = self.box_name
-        scene = self.scene
-
-        ## BEGIN_SUB_TUTORIAL remove_object
-        ##
-        ## Removing Objects from the Planning Scene
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can remove the box from the world.
-        scene.remove_world_object(box_name)
-
-        ## **Note:** The object must be detached before we can remove it from the world
-        ## END_SUB_TUTORIAL
-
-        # We wait for the planning scene to update.
-        return self.wait_for_state_update(
-            box_is_attached=False, box_is_known=False, timeout=timeout
-        )
-
-
-def job_1():
-    try:
-        tutorial = MoveGroupPythonInterfaceTutorial()
-        tutorial.add_table()
-        tutorial.add_table_placement()
-
-        input("Press any key to continue...")
-
-        start = time.time()
-        tutorial.go_to_joint_state()
-                                    # x, y, z
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.22)
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.22)
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.22)
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.22)
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
-
-        tutorial.go_to_joint_state()
-
-        print("time: ")
-        end = time.time()
-        print(end - start)
-
-    except rospy.ROSInterruptException:
-        return
-    except KeyboardInterrupt:
-        return
-
-
-def job_2():
-    try:
-        tutorial = MoveGroupPythonInterfaceTutorial()
-        tutorial.add_table()
-        tutorial.add_table_placement()
-
-        input("Press any key to continue...")
-
-        start = time.time()
-        tutorial.go_to_joint_state()
-
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.22)
-        tutorial.go_to_pose_goal(0.3, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.3, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.22)
-        tutorial.go_to_pose_goal(0.7, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.7, -0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.22)
-        tutorial.go_to_pose_goal(0.7, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.7, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.22)
-        tutorial.go_to_pose_goal(0.3, 0.2, 0.32)
-
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.22)
-        tutorial.go_to_pose_goal(-0.3, 0.2, 0.32)
-
-        tutorial.go_to_joint_state()
-
-        print("time: ")
-        end = time.time()
-        print(end - start)
-
-    except rospy.ROSInterruptException:
-        return
-    except KeyboardInterrupt:
-        return
-
-
-if __name__ == "__main__":
-    job_2()
+#####################################################################
+###=========================jit functions=========================###
+#####################################################################
+
+@torch.jit.script
+def compute_franka_reward(
+        reset_buf, progress_buf, actions, states, reward_settings, max_episode_length, cycle_time_old, torque, effort_control):
+
+    # type: (Tensor, Tensor, Tensor, Dict[str, Tensor], Dict[str, float], float, Tensor, Tensor, Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor]
+
+    # Compute per-env physical parameters
+    target_height = states["cubeB_size"] + states["cubeA_size"] / 2.0
+    cubeA_size = states["cubeA_size"]
+    cubeB_size = states["cubeB_size"]
+
+    # distance from hand to the cubeA
+    d = torch.norm(states["cubeA_pos_relative"], dim=-1)
+    d_lf = torch.norm(states["cubeA_pos"] - states["eef_lf_pos"], dim=-1)
+    d_rf = torch.norm(states["cubeA_pos"] - states["eef_rf_pos"], dim=-1)
+    dist_reward = 1 - torch.tanh(10.0 * (d + d_lf + d_rf) / 3)
+
+    # reward for lifting cubeA
+    cubeA_height = states["cubeA_pos"][:, 2] - reward_settings["table_height"]
+    cubeA_lifted = (cubeA_height - cubeA_size) > 0.04
+    lift_reward = cubeA_lifted
+
+    # how closely aligned cubeA is to cubeB (only provided if cubeA is lifted)
+    offset = torch.zeros_like(states["cubeA_to_cubeB_pos"])
+    offset[:, 2] = (cubeA_size + cubeB_size) / 2
+    d_ab = torch.norm(states["cubeA_to_cubeB_pos"] + offset, dim=-1)
+    align_reward = (1 - torch.tanh(10.0 * d_ab)) * cubeA_lifted
+
+    # Dist reward is maximum of dist and align reward
+    dist_reward = torch.max(dist_reward, align_reward)
+
+    # final reward for stacking successfully (only if cubeA is close to target height and corresponding location, and gripper is not grasping)
+    cubeA_align_cubeB = (torch.norm(states["cubeA_to_cubeB_pos"][:, :2], dim=-1) < 0.02)
+    cubeA_on_cubeB = torch.abs(cubeA_height - target_height) < 0.02
+    gripper_away_from_cubeA = (d > 0.04)
+    stack_reward = cubeA_align_cubeB & cubeA_on_cubeB & gripper_away_from_cubeA
+
+    # cycle time (number of epoch to conclude the task)
+    end_point = cubeA_align_cubeB & cubeA_on_cubeB
+    cycle_time = ((max_episode_length - progress_buf)/100.00) * end_point
+    save_cycle_time = ((cycle_time_old == 0) & end_point)
+    cycle_time_new = torch.where(save_cycle_time, cycle_time, cycle_time_old)
+    cycle_time_new = torch.where((progress_buf < 50), torch.zeros_like(cycle_time_new), cycle_time_new)
+    #print("cycle_time_new: ", cycle_time_new[0:10])
+
+    # torque
+    new_torque = abs(torque) + abs(effort_control)
+    new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
+    new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
+    new_torque[:, 2] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 2]), new_torque[:, 2])
+    new_torque[:, 3] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 3]), new_torque[:, 3])
+    new_torque[:, 4] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 4]), new_torque[:, 4])
+    new_torque[:, 5] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 5]), new_torque[:, 5])
+    new_torque[:, 6] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 6]), new_torque[:, 6])
+
+    torque_joint_0 = new_torque[:, 0] / 10000.00
+    torque_joint_1 = new_torque[:, 1] / 10000.00
+    torque_joint_2 = new_torque[:, 2] / 10000.00
+    torque_joint_3 = new_torque[:, 3] / 10000.00
+    torque_joint_4 = new_torque[:, 4] / 10000.00
+    torque_joint_5 = new_torque[:, 5] / 1000.00
+    torque_joint_6 = new_torque[:, 6] / 100.00
+
+    reward_torque_joint_0 = 1 - torque_joint_0
+    reward_torque_joint_1 = 1 - torque_joint_1
+    reward_torque_joint_2 = 1 - torque_joint_2
+    reward_torque_joint_3 = 1 - torque_joint_3
+    reward_torque_joint_4 = 1 - torque_joint_4
+    reward_torque_joint_5 = 1 - torque_joint_5
+    reward_torque_joint_6 = 1 - torque_joint_6
+
+    '''
+    print("---------------------------")
+    print("joint 0: ", new_torque[:, 0][250].item())
+    print("joint 1: ", new_torque[:, 1][250].item())
+    print("joint 2: ", new_torque[:, 2][250].item())
+    print("joint 3: ", new_torque[:, 3][250].item())
+    print("joint 4: ", new_torque[:, 4][250].item())
+    print("joint 5: ", new_torque[:, 5][250].item())
+    print("joint 6: ", new_torque[:, 6][250].item())
+    '''
+
+    # check cube b position
+    #cubeB_not_in_position = (states["cubeB_pos"][:, 2] < 1.10)
+
+    # check if the gripper is closed without cube A
+    #d_lf_rf = torch.norm(states["eef_rf_pos"] - states["eef_lf_pos"], dim=-1)
+    #gripper_closed_without_cube = (d_lf_rf < 0.03)
+
+    # check if cube A is on top of cube B
+    #gripper_open_after_dropoff = cubeA_align_cubeB * d_lf_rf * 10 * d
+
+    # Compose rewards
+    rewards = reward_settings["r_dist_scale"] * dist_reward + \
+              reward_settings["r_lift_scale"] * lift_reward + \
+              reward_settings["r_align_scale"] * align_reward #+ \
+              #cycle_time_new + \
+              #0.3 * reward_torque_joint_0 * end_point + \
+              #0.3 * reward_torque_joint_1 * end_point + \
+              #0.2 * reward_torque_joint_2 * end_point + \
+              #0.1 * reward_torque_joint_3 * end_point + \
+              #0.05 * reward_torque_joint_4 * end_point + \
+              #0.03 * reward_torque_joint_5 * end_point + \
+              #0.02 * reward_torque_joint_6 * end_point
+
+    # We either provide the stack reward or the align + dist reward
+    rewards = torch.where(stack_reward, reward_settings["r_stack_scale"] * stack_reward, rewards)
+    '''
+    print("progress_buf   : ", progress_buf[250])
+    print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[250].item())
+    print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[250].item())
+    print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[250].item())
+    print("cycle_time_new : ", cycle_time_new[250].item())
+    '''
+    '''
+    print("torque_joint_0 : ", (0.3 * reward_torque_joint_0[250] * end_point[250]).item())
+    print("torque_joint_1 : ", (0.3 * reward_torque_joint_1[250] * end_point[250]).item())
+    print("torque_joint_2 : ", (0.2 * reward_torque_joint_2[250] * end_point[250]).item())
+    print("torque_joint_3 : ", (0.1 * reward_torque_joint_3[250] * end_point[250]).item())
+    print("torque_joint_4 : ", (0.05 * reward_torque_joint_4[250] * end_point[250]).item())
+    print("torque_joint_5 : ", (0.03 * reward_torque_joint_5[250] * end_point[250]).item())
+    print("torque_joint_6 : ", (0.02 * reward_torque_joint_6[250] * end_point[250]).item())
+    '''
+
+
+    #rewards = torch.where(gripper_open_after_dropoff, gripper_open_after_dropoff + 10, rewards)
+
+    # penalty
+    # rewards = torch.where(gripper_closed_without_cube, rewards * 0.9, rewards)
+    # rewards = torch.where(cubeB_not_in_position, torch.ones_like(rewards) * -1, rewards)
+
+    # Compute resets
+    reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf),
+                            reset_buf)
+
+    return rewards, reset_buf, cycle_time_new, new_torque
