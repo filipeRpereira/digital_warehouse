@@ -457,6 +457,9 @@ class FrankaCubeStack(VecTask):
 
             "cubeB_initial_pos": self._init_cubeB_state[:, :3],
             "cubeB_initial_quat": self._init_cubeB_state[:, 3:7],
+
+            "cubeA_initial_pos": self._init_cubeA_state[:, :3],
+            "cubeA_initial_quat": self._init_cubeA_state[:, 3:7],
         })
 
     def _refresh(self):
@@ -793,23 +796,21 @@ def compute_franka_reward(
     cycle_time = ((max_episode_length - progress_buf) / 100.00) * end_point
     save_cycle_time = ((cycle_time_old == 0) & end_point)
     cycle_time_new = torch.where(save_cycle_time, cycle_time, cycle_time_old)
-    cycle_time_new = torch.where((progress_buf < 1), torch.zeros_like(cycle_time_new), cycle_time_new)
+    cycle_time_new = torch.where((progress_buf < 50), torch.zeros_like(cycle_time_new), cycle_time_new)
     # print("cycle_time_new: ", cycle_time_new[0:10])
 
     fraka_id = 250
     # torque
     new_torque = abs(torque) + abs(effort_control)
     '''
-    new_torque[:, 0] = torch.where(end_point, torque[:, 0],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 1] = torch.where(end_point, torque[:, 1],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 2] = torch.where(end_point, torque[:, 2],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 3] = torch.where(end_point, torque[:, 3],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 4] = torch.where(end_point, torque[:, 4],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 5] = torch.where(end_point, torque[:, 5],  new_torque[:, 0] / 10000.00)
-    new_torque[:, 6] = torch.where(end_point, torque[:, 6],  new_torque[:, 0] / 10000.00)
-
+    new_torque[:, 0] = torch.where(end_point, abs(torque[:, 0]),  new_torque[:, 0])
+    new_torque[:, 1] = torch.where(end_point, abs(torque[:, 1]),  new_torque[:, 0])
+    new_torque[:, 2] = torch.where(end_point, abs(torque[:, 2]),  new_torque[:, 0])
+    new_torque[:, 3] = torch.where(end_point, abs(torque[:, 3]),  new_torque[:, 0])
+    new_torque[:, 4] = torch.where(end_point, abs(torque[:, 4]),  new_torque[:, 0])
+    new_torque[:, 5] = torch.where(end_point, abs(torque[:, 5]),  new_torque[:, 0])
+    new_torque[:, 6] = torch.where(end_point, abs(torque[:, 6]),  new_torque[:, 0])
     '''
-
     new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
     new_torque[:, 2] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 2]), new_torque[:, 2])
@@ -818,30 +819,28 @@ def compute_franka_reward(
     new_torque[:, 5] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 5]), new_torque[:, 5])
     new_torque[:, 6] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 6]), new_torque[:, 6])
 
+    torque_joint_0 = new_torque[:, 0] / 10000.00
+    torque_joint_1 = new_torque[:, 1] / 10000.00
+    torque_joint_2 = new_torque[:, 2] / 10000.00
+    torque_joint_3 = new_torque[:, 3] / 10000.00
+    torque_joint_4 = new_torque[:, 4] / 10000.00
+    torque_joint_5 = new_torque[:, 5] / 1000.00
+    torque_joint_6 = new_torque[:, 6] / 100.00
 
-    reward_torque_joint_0 = 1 - (new_torque[:, 0] / 10000.00)
-    reward_torque_joint_1 = 1 - (new_torque[:, 1] / 10000.00)
-    reward_torque_joint_2 = 1 - (new_torque[:, 2] / 10000.00)
-    reward_torque_joint_3 = 1 - (new_torque[:, 3] / 10000.00)
-    reward_torque_joint_4 = 1 - (new_torque[:, 4] / 10000.00)
-    reward_torque_joint_5 = 1 - (new_torque[:, 5] / 10000.00)
-    reward_torque_joint_6 = 1 - (new_torque[:, 6] / 10000.00)
-
-
+    reward_torque_joint_0 = 1 - torque_joint_0
+    reward_torque_joint_1 = 1 - torque_joint_1
+    reward_torque_joint_2 = 1 - torque_joint_2
+    reward_torque_joint_3 = 1 - torque_joint_3
+    reward_torque_joint_4 = 1 - torque_joint_4
+    reward_torque_joint_5 = 1 - torque_joint_5
+    reward_torque_joint_6 = 1 - torque_joint_6
 
     # Metrics
-    torque_total_metric = new_torque[:, 0] + new_torque[:, 1] +new_torque[:, 2] +new_torque[:, 3] +new_torque[:, 4] + \
-                          new_torque[:, 5] + new_torque[:, 6]
+    torque_total_metric = new_torque[:, 0] + new_torque[:, 1] + new_torque[:, 2] + \
+                          new_torque[:, 3] + new_torque[:, 4] + new_torque[:, 5] + new_torque[:, 6]
 
     # check cube b position
     cubeB_in_position = (abs(states["cubeB_pos"][:, 2] - states["cubeB_initial_pos"][:, 2]) < 0.015)
-
-    # check if the gripper is closed without cube A
-    # d_lf_rf = torch.norm(states["eef_rf_pos"] - states["eef_lf_pos"], dim=-1)
-    # gripper_closed_without_cube = (d_lf_rf < 0.03)
-
-    # check if cube A is on top of cube B
-    # gripper_open_after_dropoff = cubeA_align_cubeB * d_lf_rf * 10 * d
 
     # Compose rewards
     rewards = reward_settings["r_dist_scale"] * dist_reward + \
@@ -863,10 +862,11 @@ def compute_franka_reward(
     # print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
     # print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
     # print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
-    # print("cubeB in pos   : ", cubeB_in_position[fraka_id].item())
+    #print("cubeB in pos   : ", cubeB_in_position[fraka_id].item())
+    #print("end point      : ", end_point[fraka_id].item())
     print("cycle_time     : ", cycle_time_new[fraka_id].item())
     print("torque_total   : ", torque_total_metric[fraka_id].item())
-    print("reward         : ", rewards[fraka_id].item())
+    #print(states["cubeA_initial_pos"][250])
     # '''
 
     '''
@@ -882,8 +882,17 @@ def compute_franka_reward(
     # rewards = torch.where(gripper_open_after_dropoff, gripper_open_after_dropoff + 10, rewards)
 
     # penalty
-    # rewards = torch.where(gripper_closed_without_cube, rewards * 0.9, rewards)
+
+    # cubeA_lifted
+    dif_cubeA_initial_actual_pos = abs(states["cubeA_pos"][:, 0] - states["cubeA_initial_pos"][:, 0])
+    cubeA_dragged = (dif_cubeA_initial_actual_pos > 0.0001) & (cubeA_lifted < 1)
+    print("dragged        : ", cubeA_dragged[250].item())
+
+    rewards = torch.where(cubeA_dragged, torch.ones_like(rewards) * -1, rewards)
+
     rewards = torch.where(cubeB_in_position, rewards, torch.ones_like(rewards) * -1)
+
+    print("reward         : ", rewards[fraka_id].item())
 
     # Compute resets
     reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf),
