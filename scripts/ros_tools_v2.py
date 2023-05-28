@@ -13,7 +13,8 @@ import argparse
 
 #job_name = "job_2"
 
-
+time_test = 20000
+time_started = 0
 
 robot_home_position = False
 
@@ -29,7 +30,8 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
     for i in range(len(home_position)):
         home_position[i] = home_position[i].replace('(', '').replace(')', '')
 
-    home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
+    home_values = [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04]
+    #home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     dif = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -41,7 +43,7 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
 
     home = True
     for i in range(len(dif)):
-        if dif[i] > 0.01:
+        if dif[i] > 0.1:
             home = False
 
     global robot_home_position
@@ -364,6 +366,13 @@ def read_json_data():
     return jsonData
 
 
+def read_multiple_json_data(json_file):
+    # Opening JSON file
+    with open(json_file) as file:
+        jsonData = json.load(file)
+
+    return jsonData
+
 
 ## Colocar unidades nos gráficos
 def plot_data(json_data):
@@ -538,64 +547,73 @@ def get_execution_time(jsonData):
 
 
 ## OK
-def get_angular_acceleration(jsonData, plot):
+def get_angular_acceleration(jsonData, plot, num_samples):
     total_frames = len(jsonData["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
+
     angular_acceleration_array = np.empty(shape=(len(listOfJoints), total_frames-1))
     angular_acceleration_array.fill(0)
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData["frames"])):
-            angular_acceleration_array[i][j-1] = jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"]
+            pre_stamp = jsonData["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData["frames"][j-1]["header"]["stamp"][10:]
+            act_stamp = jsonData["frames"][j]["header"]["stamp"][0:10] + "." + jsonData["frames"][j]["header"]["stamp"][10:]
+            delta_time = float(act_stamp) - float(pre_stamp)
+            acc = jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"]
 
-    fig1, axs1 = plt.subplots(3)
-    axs1[0].plot(angular_acceleration_array[0])
-    axs1[0].set_title('Aceleração Angular - Junta 0')
-    axs1[1].plot(angular_acceleration_array[1])
-    axs1[1].set_title('Aceleração Angular - Junta 1')
-    axs1[2].plot(angular_acceleration_array[2])
-    axs1[2].set_title('Aceleração Angular - Junta 2')
-
-    fig1.tight_layout()
-    yLabel = "º/s²"
-    for ax in axs1.flat:
-        ax.set(xlabel='Amostras', ylabel=yLabel)
-
-    fig2, axs1 = plt.subplots(3)
-    axs1[0].plot(angular_acceleration_array[3])
-    axs1[0].set_title('Aceleração Angular - Junta 3')
-    axs1[1].plot(angular_acceleration_array[4])
-    axs1[1].set_title('Aceleração Angular - Junta 4')
-    axs1[2].plot(angular_acceleration_array[5])
-    axs1[2].set_title('Aceleração Angular - Junta 5')
-
-    fig2.tight_layout()
-    yLabel = "º/s²"
-    for ax in axs1.flat:
-        ax.set(xlabel='Amostras', ylabel=yLabel)
-
-    fig3, axs1 = plt.subplots(3)
-    axs1[0].plot(angular_acceleration_array[6])
-    axs1[0].set_title('Aceleração Angular - Junta 6')
-    axs1[1].plot(angular_acceleration_array[7])
-    axs1[1].set_title('Aceleração Angular - Junta 7')
-    axs1[2].plot(angular_acceleration_array[8])
-    axs1[2].set_title('Aceleração Angular - Junta 8')
-
-    fig3.tight_layout()
-    yLabel = "º/s²"
-    for ax in axs1.flat:
-        ax.set(xlabel='Amostras', ylabel=yLabel)
-
-    if plot:
-        plt.show()
+            angular_acceleration_array[i][j-1] = acc/delta_time
 
     return angular_acceleration_array
 
 
+def get_multiple_angular_acceleration(jsonData_0, jsonData_1, plot, num_samples, joint_num):
+    total_frames_0 = len(jsonData_0["frames"])
+    total_frames_1 = len(jsonData_1["frames"])
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+    angular_acceleration_array_0 = np.empty(shape=(len(listOfJoints), total_frames_0-1))
+    angular_acceleration_array_0.fill(0)
+
+    angular_acceleration_array_1 = np.empty(shape=(len(listOfJoints), total_frames_1-1))
+    angular_acceleration_array_1.fill(0)
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, len(jsonData_0["frames"])):
+            pre_stamp = jsonData_0["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData_0["frames"][j-1]["header"]["stamp"][10:]
+            act_stamp = jsonData_0["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_0["frames"][j]["header"]["stamp"][10:]
+            delta_time = float(act_stamp) - float(pre_stamp)
+            acc = jsonData_0["frames"][j][listOfJoints[i]]["velocity"] - jsonData_0["frames"][j-1][listOfJoints[i]]["velocity"]
+
+            angular_acceleration_array_0[i][j-1] = acc/delta_time
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, len(jsonData_1["frames"])):
+            pre_stamp = jsonData_1["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData_1["frames"][j-1]["header"]["stamp"][10:]
+            act_stamp = jsonData_1["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_1["frames"][j]["header"]["stamp"][10:]
+            delta_time = float(act_stamp) - float(pre_stamp)
+            acc = jsonData_1["frames"][j][listOfJoints[i]]["velocity"] - jsonData_1["frames"][j-1][listOfJoints[i]]["velocity"]
+
+            angular_acceleration_array_1[i][j-1] = acc/delta_time
+
+    fase_0 = angular_acceleration_array_0[joint_num][0:num_samples]
+    fase_1 = angular_acceleration_array_1[joint_num][0:num_samples]
+
+    plt.plot(fase_0)
+    plt.plot(fase_1)
+
+    plt.title(listOfJoints[joint_num])
+
+    plt.xlabel("Number of Epochs")
+    plt.ylabel("Angular Acceleration (º/s²)")
+
+    plt.legend(["Initial State", "Optimized State"], loc="lower right")
+
+    plt.show()
+
+
 ## OK IMPORTANT!!!
-def get_angular_acceleration_sum(ang_acceleration):
+def get_angular_acceleration_sum(ang_acceleration, num_samples):
     total_frames = len(jsonData["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
@@ -603,10 +621,27 @@ def get_angular_acceleration_sum(ang_acceleration):
 
     for i in range(len(listOfJoints)):
         aux = 0
-        for j in range(len(jsonData["frames"])-1):
+        for j in range(num_samples - 1):
             aux = aux + abs(ang_acceleration[i][j])
         acc[i] = aux
     return acc
+
+
+def histogram(ini_acc, end_acc, joint_num, num_samples):
+    fig, ax1 = plt.subplots()
+    colors = ['r', 'g']
+    ax1.hist([ini_acc[joint_num][:num_samples], end_acc[joint_num][:num_samples]], color=colors,
+             label=['Initial State', 'Optimized State'])
+    ax1.set_xlim(-30, 30)
+    ax1.set_ylabel("Count")
+    plt.legend(loc='upper right')
+
+    plt.xlabel("Angular acceleration samples")
+    plt.ylabel("Number of samples")
+    plt.title("Joint " + str(joint_num))
+
+    plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -615,7 +650,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
     parser.add_argument('--job_name', help='Save data from ROS topics.',
-                        required=False, default="job_1")
+                        required=False, default="Task_1_fase_0")
+    parser.add_argument('--job_name_2', help='Save data from ROS topics.',
+                        required=False, default="Task_1_fase_2")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--get_exec_time', help='Get the execution time of robot task.',
@@ -624,11 +661,16 @@ if __name__ == '__main__':
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration.',
                         required=False, default=False)
+    parser.add_argument('--plot_all_acc', help='Plot the angular acceleration for 3 samples.',
+                        required=False, default=False)
+    parser.add_argument('--plot_joint_num', help='Name of the joint to plot the angular acceleration for 3 samples.',
+                        required=False, default="0")
 
     args = parser.parse_args()
 
     job_name = args.job_name
     json_file = "/home/filipe/Desktop/Dissertação/" + args.job_name + ".json"
+    json_file_2 = "/home/filipe/Desktop/Dissertação/" + args.job_name_2 + ".json"
 
     if args.save_data:
         listener_ros_topics()
@@ -643,13 +685,28 @@ if __name__ == '__main__':
         print("Sampling Time: ", sampling_time)
 
     if args.get_angular_acc:
-        jsonData = read_json_data()
-        ang_acceleration = get_angular_acceleration(jsonData, False)
-        angular_acceleration_sum = get_angular_acceleration_sum(ang_acceleration)
-        print("Angular acceleration: ")
-        print(angular_acceleration_sum)
+        jsonData_0 = read_multiple_json_data(json_file)
+        jsonData_1 = read_multiple_json_data(json_file_2)
+        ang_acceleration_0 = get_angular_acceleration(jsonData_0, False, 50)
+        ang_acceleration_1 = get_angular_acceleration(jsonData_1, False, 50)
+
+        angular_acceleration_sum_0 = get_angular_acceleration_sum(ang_acceleration_0, 50)
+        angular_acceleration_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, 50)
+
+        histogram(ang_acceleration_0, ang_acceleration_1, int(args.plot_joint_num), 50)
+
+        print("Angular acceleration ini: ")
+        print(angular_acceleration_sum_0)
+        print("Angular acceleration end: ")
+        print(angular_acceleration_sum_1)
 
     if args.plot_acc:
         jsonData = read_json_data()
-        get_angular_acceleration(jsonData, args.plot_acc)
+        get_angular_acceleration(jsonData, args.plot_acc, 50)
+
+    if args.plot_all_acc:
+        jsonData_0 = read_multiple_json_data(json_file)
+        jsonData_1 = read_multiple_json_data(json_file_2)
+        get_multiple_angular_acceleration(jsonData_0, jsonData_1, args.plot_all_acc, 50,
+                                          int(args.plot_joint_num))
 
