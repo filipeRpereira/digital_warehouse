@@ -49,6 +49,7 @@ from geometry_msgs.msg import PoseStamped, Pose
 from moveit_msgs.msg import MoveItErrorCodes
 
 from std_msgs.msg import Header
+import std_msgs.msg
 
 
 rospy.init_node("isaac_gym", anonymous=False)
@@ -752,10 +753,12 @@ class FrankaCubeStack(VecTask):
     def get_joints_values(self, env_num):
         positions = []
         velocity = []
+        effort = []
         joint_names = ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4',
                        'panda_joint5', 'panda_joint6', 'panda_joint7',
                        'panda_finger_joint1', 'panda_finger_joint2']
 
+        # Positions
         for i in range(7):
             joint_state_position = np.array(self._q[env_num][i].item())
             positions.append(joint_state_position)
@@ -763,8 +766,28 @@ class FrankaCubeStack(VecTask):
             gripper_state_position = np.array(self._gripper_control[env_num, i].item())
             positions.append(gripper_state_position)
 
+        # Velocity
+        for i in range(7):
+            joint_state_velocity = np.array(self._qd[env_num][i].item())
+            velocity.append(joint_state_velocity)
+        for i in range(2):
+            gripper_state_velocity = np.array(self.states["eef_vel"][env_num, i].item())
+            velocity.append(gripper_state_velocity)
+
+        # Effort
+        for i in range(7):
+            joint_state_effort = np.array(self._arm_control[env_num][i].item())
+            effort.append(joint_state_effort)
+        for i in range(2):
+            gripper_state_effort = np.array(self._gripper_control[env_num, i].item())
+            effort.append(gripper_state_effort)
+
+        joint_command_isaac.header.stamp = rospy.Time.now()
+        joint_command_isaac.header.frame_id = "Isaac Gym"
         joint_command_isaac.name = joint_names
         joint_command_isaac.position = positions
+        joint_command_isaac.velocity = velocity
+        joint_command_isaac.effort = effort
         pub.publish(joint_command_isaac)
 
 
