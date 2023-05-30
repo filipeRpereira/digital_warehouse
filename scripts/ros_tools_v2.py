@@ -636,7 +636,7 @@ def histogram(ini_acc, end_acc, joint_num, num_samples):
     ax1.set_ylabel("Count")
     plt.legend(loc='upper right')
 
-    plt.xlabel("Angular acceleration samples")
+    plt.xlabel("Angular Acceleration (º/s²)")
     plt.ylabel("Number of samples")
     plt.title("Joint " + str(joint_num))
 

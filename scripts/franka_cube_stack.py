@@ -45,13 +45,15 @@ import rospy
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectoryPoint
 from moveit_msgs.msg import Grasp
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from moveit_msgs.msg import MoveItErrorCodes
 
+from std_msgs.msg import Header
 
-# rospy.init_node("isaac_gym", anonymous=False)
-# joint_command_isaac = JointState()
-# pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
+
+rospy.init_node("isaac_gym", anonymous=False)
+joint_command_isaac = JointState()
+pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
 
 
 @torch.jit.script
@@ -242,6 +244,13 @@ class FrankaCubeStack(VecTask):
         table_stand_opts.fix_base_link = True
         table_stand_asset = self.gym.create_box(self.sim, *[0.2, 0.2, table_stand_height], table_opts)
 
+
+        wall_height = 0.00
+        wall_pos = [0.1, 0.1, 1.0 + table_thickness / 2 + wall_height / 2]
+        wall_opts = gymapi.AssetOptions()
+        wall_opts.fix_base_link = True
+        wall_asset = self.gym.create_box(self.sim, *[0.9, 0.01, wall_height], table_opts)
+
         self.cubeA_size = 0.050
         self.cubeB_size = 0.070
         # self.cubeB_size = 0.200
@@ -306,6 +315,11 @@ class FrankaCubeStack(VecTask):
         table_stand_start_pose.p = gymapi.Vec3(*table_stand_pos)
         table_stand_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
+        # Define start pose for wall
+        wall_start_pose = gymapi.Transform()
+        wall_start_pose.p = gymapi.Vec3(*wall_pos)
+        wall_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+
         # Define start pose for cubes (doesn't really matter since they're get overridden during reset() anyways)
         cubeA_start_pose = gymapi.Transform()
         cubeA_start_pose.p = gymapi.Vec3(0.1, 0.1, 0.0)
@@ -354,6 +368,7 @@ class FrankaCubeStack(VecTask):
             table_actor = self.gym.create_actor(env_ptr, table_asset, table_start_pose, "table", i, 1, 0)
             table_stand_actor = self.gym.create_actor(env_ptr, table_stand_asset, table_stand_start_pose, "table_stand",
                                                       i, 1, 0)
+            wall_actor = self.gym.create_actor(env_ptr, wall_asset, wall_start_pose, "wall", i, 1, 0)
 
             if self.aggregate_mode == 1:
                 self.gym.begin_aggregate(env_ptr, max_agg_bodies, max_agg_shapes, True)
@@ -434,7 +449,7 @@ class FrankaCubeStack(VecTask):
         self._gripper_control = self._pos_control[:, 7:9]
 
         # Initialize indices
-        self._global_indices = torch.arange(self.num_envs * 5, dtype=torch.int32,
+        self._global_indices = torch.arange(self.num_envs * 6, dtype=torch.int32,
                                             device=self.device).view(self.num_envs, -1)
 
     def _update_states(self):
@@ -690,10 +705,13 @@ class FrankaCubeStack(VecTask):
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
 
-        # self.get_joints_values(fraka_id)
+        self.get_joints_values(250)
 
     def post_physics_step(self):
         self.progress_buf += 1
+
+        if self.progress_buf[250] > 319:
+            exit()
 
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
 
@@ -799,10 +817,10 @@ def compute_franka_reward(
     cycle_time_new = torch.where((progress_buf < 50), torch.zeros_like(cycle_time_new), cycle_time_new)
     # print("cycle_time_new: ", cycle_time_new[0:10])
 
-    fraka_id = 250
+    fraka_id = 10
     # torque
     new_torque = abs(torque) + abs(effort_control)
-    '''
+    #'''
     new_torque[:, 0] = torch.where(end_point, abs(torque[:, 0]),  new_torque[:, 0])
     new_torque[:, 1] = torch.where(end_point, abs(torque[:, 1]),  new_torque[:, 0])
     new_torque[:, 2] = torch.where(end_point, abs(torque[:, 2]),  new_torque[:, 0])
@@ -810,7 +828,7 @@ def compute_franka_reward(
     new_torque[:, 4] = torch.where(end_point, abs(torque[:, 4]),  new_torque[:, 0])
     new_torque[:, 5] = torch.where(end_point, abs(torque[:, 5]),  new_torque[:, 0])
     new_torque[:, 6] = torch.where(end_point, abs(torque[:, 6]),  new_torque[:, 0])
-    '''
+    #'''
     new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
     new_torque[:, 2] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 2]), new_torque[:, 2])
@@ -859,10 +877,9 @@ def compute_franka_reward(
     rewards = torch.where(stack_reward, reward_settings["r_stack_scale"] * stack_reward, rewards)
     # '''
     print("progress_buf   : ", progress_buf[fraka_id].item())
-    # print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
-    # print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
-    # print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
-    #print("cubeB in pos   : ", cubeB_in_position[fraka_id].item())
+    print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
+    print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
+    print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
     #print("end point      : ", end_point[fraka_id].item())
     print("cycle_time     : ", cycle_time_new[fraka_id].item())
     print("torque_total   : ", torque_total_metric[fraka_id].item())
@@ -884,15 +901,17 @@ def compute_franka_reward(
     # penalty
 
     # cubeA_lifted
-    dif_cubeA_initial_actual_pos = abs(states["cubeA_pos"][:, 0] - states["cubeA_initial_pos"][:, 0])
-    cubeA_dragged = (dif_cubeA_initial_actual_pos > 0.0001) & (cubeA_lifted < 1)
-    print("dragged        : ", cubeA_dragged[250].item())
-
-    rewards = torch.where(cubeA_dragged, torch.ones_like(rewards) * -1, rewards)
+    #dif_cubeA_initial_actual_pos = abs(states["cubeA_pos"][:, 0] - states["cubeA_initial_pos"][:, 0])
+    #cubeA_dragged = (dif_cubeA_initial_actual_pos > 0.0001) & (cubeA_lifted < 1)
+    #rewards = torch.where(cubeA_dragged, torch.ones_like(rewards) * -1, rewards)
 
     rewards = torch.where(cubeB_in_position, rewards, torch.ones_like(rewards) * -1)
 
+    #fraka_too_far = ((align_reward[fraka_id] < 0.00001) & cubeA_lifted)
+    #rewards = torch.where(fraka_too_far, rewards * 0.5, rewards)
+
     print("reward         : ", rewards[fraka_id].item())
+
 
     # Compute resets
     reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf),
