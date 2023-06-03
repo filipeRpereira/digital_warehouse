@@ -20,18 +20,14 @@ robot_home_position = False
 
 
 ## OK
-def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
-                                 imu_link_6, imu_link_7, imu_link_8):
+def callback_check_home_position(joints):
     joint_position = joints.position
-    # '0.0', ' -0.7853', ' -0.0001', ' -1.5715', ' 0.0', ' 1.0423', ' 0.0', ' 0.0347', ' 0.0353)']
-
     home_position = str(joint_position).split(',')
 
     for i in range(len(home_position)):
         home_position[i] = home_position[i].replace('(', '').replace(')', '')
 
     home_values = [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04]
-    #home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     dif = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -50,8 +46,7 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
 
     if not home:
         print("Not Home Position", flush=True, end="\r")
-        save_json_data(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3,
-                       imu_link_4, imu_link_5, imu_link_6, imu_link_7, imu_link_8)
+        save_json_data(joints)
 
     else:
         print("Home Position", flush=True, end="\r")
@@ -67,26 +62,15 @@ def listener_ros_topics():
         outfile.write(json_object)
 
     rospy.init_node('listener_new', anonymous=False)
-    jointStates_sub = message_filters.Subscriber('joint_states_issac', JointState)
-    imuLink0_sub = message_filters.Subscriber('imu_link0', Imu)
-    imuLink1_sub = message_filters.Subscriber('imu_link1', Imu)
-    imuLink2_sub = message_filters.Subscriber('imu_link2', Imu)
-    imuLink3_sub = message_filters.Subscriber('imu_link3', Imu)
-    imuLink4_sub = message_filters.Subscriber('imu_link4', Imu)
-    imuLink5_sub = message_filters.Subscriber('imu_link5', Imu)
-    imuLink6_sub = message_filters.Subscriber('imu_link6', Imu)
-    imuLink7_sub = message_filters.Subscriber('imu_link7', Imu)
-    imuLink8_sub = message_filters.Subscriber('imu_link8', Imu)
+    jointStates_sub = message_filters.Subscriber('joint_states', JointState)
 
-    ts = message_filters.TimeSynchronizer([jointStates_sub, imuLink0_sub, imuLink1_sub, imuLink2_sub, imuLink3_sub,
-                                           imuLink4_sub, imuLink5_sub, imuLink6_sub, imuLink7_sub, imuLink8_sub], 10)
+    ts = message_filters.TimeSynchronizer([jointStates_sub], 10)
     ts.registerCallback(callback_check_home_position)
     rospy.spin()
 
 
 ## OK
-def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
-                   imu_link_6, imu_link_7, imu_link_8):
+def save_json_data(data):
     joint_velocity_0 = data.velocity[0]
     joint_effort_0 = data.effort[0]
     if str(joint_velocity_0) == "nan":
@@ -160,19 +144,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_0,
             "imu": {
                 "orientation": {
-                    "x": imu_link_0.orientation.x,
-                    "y": imu_link_0.orientation.y,
-                    "z": imu_link_0.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_0.angular_velocity.x,
-                    "y": imu_link_0.angular_velocity.y,
-                    "z": imu_link_0.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_0.linear_acceleration.x,
-                    "y": imu_link_0.linear_acceleration.y,
-                    "z": imu_link_0.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -181,19 +165,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_1,
             "imu": {
                 "orientation": {
-                    "x": imu_link_1.orientation.x,
-                    "y": imu_link_1.orientation.y,
-                    "z": imu_link_1.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_1.angular_velocity.x,
-                    "y": imu_link_1.angular_velocity.y,
-                    "z": imu_link_1.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_1.linear_acceleration.x,
-                    "y": imu_link_1.linear_acceleration.y,
-                    "z": imu_link_1.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -202,19 +186,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_2,
             "imu": {
                 "orientation": {
-                    "x": imu_link_2.orientation.x,
-                    "y": imu_link_2.orientation.y,
-                    "z": imu_link_2.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_2.angular_velocity.x,
-                    "y": imu_link_2.angular_velocity.y,
-                    "z": imu_link_2.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_2.linear_acceleration.x,
-                    "y": imu_link_2.linear_acceleration.y,
-                    "z": imu_link_2.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -223,19 +207,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_3,
             "imu": {
                 "orientation": {
-                    "x": imu_link_3.orientation.x,
-                    "y": imu_link_3.orientation.y,
-                    "z": imu_link_3.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_3.angular_velocity.x,
-                    "y": imu_link_3.angular_velocity.y,
-                    "z": imu_link_3.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_3.linear_acceleration.x,
-                    "y": imu_link_3.linear_acceleration.y,
-                    "z": imu_link_3.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -244,19 +228,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_4,
             "imu": {
                 "orientation": {
-                    "x": imu_link_4.orientation.x,
-                    "y": imu_link_4.orientation.y,
-                    "z": imu_link_4.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_4.angular_velocity.x,
-                    "y": imu_link_4.angular_velocity.y,
-                    "z": imu_link_4.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_4.linear_acceleration.x,
-                    "y": imu_link_4.linear_acceleration.y,
-                    "z": imu_link_4.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -265,19 +249,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_5,
             "imu": {
                 "orientation": {
-                    "x": imu_link_5.orientation.x,
-                    "y": imu_link_5.orientation.y,
-                    "z": imu_link_5.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_5.angular_velocity.x,
-                    "y": imu_link_5.angular_velocity.y,
-                    "z": imu_link_5.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_5.linear_acceleration.x,
-                    "y": imu_link_5.linear_acceleration.y,
-                    "z": imu_link_5.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -286,19 +270,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_6,
             "imu": {
                 "orientation": {
-                    "x": imu_link_6.orientation.x,
-                    "y": imu_link_6.orientation.y,
-                    "z": imu_link_6.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_6.angular_velocity.x,
-                    "y": imu_link_6.angular_velocity.y,
-                    "z": imu_link_6.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_6.linear_acceleration.x,
-                    "y": imu_link_6.linear_acceleration.y,
-                    "z": imu_link_6.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -307,19 +291,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_7,
             "imu": {
                 "orientation": {
-                    "x": imu_link_7.orientation.x,
-                    "y": imu_link_7.orientation.y,
-                    "z": imu_link_7.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_7.angular_velocity.x,
-                    "y": imu_link_7.angular_velocity.y,
-                    "z": imu_link_7.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_7.linear_acceleration.x,
-                    "y": imu_link_7.linear_acceleration.y,
-                    "z": imu_link_7.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         },
@@ -328,19 +312,19 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "velocity": joint_velocity_8,
             "imu": {
                 "orientation": {
-                    "x": imu_link_8.orientation.x,
-                    "y": imu_link_8.orientation.y,
-                    "z": imu_link_8.orientation.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "angular_velocity": {
-                    "x": imu_link_8.angular_velocity.x,
-                    "y": imu_link_8.angular_velocity.y,
-                    "z": imu_link_8.angular_velocity.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 },
                 "linear_acceleration": {
-                    "x": imu_link_8.linear_acceleration.x,
-                    "y": imu_link_8.linear_acceleration.y,
-                    "z": imu_link_8.linear_acceleration.z
+                    "x": 0.0,
+                    "y": 0.0,
+                    "z": 0.0
                 }
             }
         }
@@ -357,16 +341,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
         json.dump(dataFromJsonFile, file)
 
 
-## OK
-def read_json_data():
-    # Opening JSON file
-    with open(json_file) as file:
-        jsonData = json.load(file)
-
-    return jsonData
-
-
-def read_multiple_json_data(json_file):
+def read_json_data(json_file):
     # Opening JSON file
     with open(json_file) as file:
         jsonData = json.load(file)
@@ -538,14 +513,6 @@ def get_effort_sum(jsonData):
     return effort
 
 
-## OK - IMPORTANT!!!
-def get_execution_time(jsonData):
-    total_frames = len(jsonData["frames"])
-    sampling_time = 42 / total_frames
-    execution_time = sampling_time * total_frames
-    return execution_time, sampling_time
-
-
 ## OK
 def get_angular_acceleration(jsonData, plot, num_samples):
     total_frames = len(jsonData["frames"])
@@ -687,8 +654,6 @@ if __name__ == '__main__':
                         required=False, default="Task_1_fase_2")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
-    parser.add_argument('--get_exec_time', help='Get the execution time of robot task.',
-                        required=False, default=False)
     parser.add_argument('--get_angular_acc', help='Get the sum of angular acceleration of each joint.',
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration.',
@@ -703,24 +668,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     job_name = args.job_name
-    json_file = "/home/filipe/Desktop/Dissertação/" + args.job_name + ".json"
-    json_file_2 = "/home/filipe/Desktop/Dissertação/" + args.job_name_2 + ".json"
+    json_file = "/home/filipe/Desktop/Dissertação/Isaac_Gym/" + args.job_name + ".json"
+    json_file_2 = "/home/filipe/Desktop/Dissertação/Isaac_Gym/" + args.job_name_2 + ".json"
 
     if args.save_data:
         listener_ros_topics()
 
     if args.read_data:
-        jsonData = read_json_data()
+        jsonData = read_json_data(json_file)
 
-    if args.get_exec_time:
-        jsonData = read_json_data()
-        execution_time, sampling_time = get_execution_time(jsonData)
-        print("Execution Time: ", execution_time)
-        print("Sampling Time: ", sampling_time)
 
     if args.get_angular_acc:
-        jsonData_0 = read_multiple_json_data(json_file)
-        jsonData_1 = read_multiple_json_data(json_file_2)
+        jsonData_0 = read_json_data(json_file)
+        jsonData_1 = read_json_data(json_file_2)
         ang_acceleration_0 = get_angular_acceleration(jsonData_0, False, 50)
         ang_acceleration_1 = get_angular_acceleration(jsonData_1, False, 50)
 
@@ -735,17 +695,17 @@ if __name__ == '__main__':
         print(angular_acceleration_sum_1)
 
     if args.plot_acc:
-        jsonData = read_json_data()
+        jsonData = read_json_data(json_file)
         get_angular_acceleration(jsonData, args.plot_acc, 50)
 
     if args.plot_all_acc:
-        jsonData_0 = read_multiple_json_data(json_file)
-        jsonData_1 = read_multiple_json_data(json_file_2)
+        jsonData_0 = read_json_data(json_file)
+        jsonData_1 = read_json_data(json_file_2)
         get_multiple_angular_acceleration(jsonData_0, jsonData_1, args.plot_all_acc, 50,
                                           int(args.plot_joint_num))
 
     if args.plot_effort:
-        jsonData_0 = read_multiple_json_data(json_file)
-        jsonData_1 = read_multiple_json_data(json_file_2)
+        jsonData_0 = read_json_data(json_file)
+        jsonData_1 = read_json_data(json_file_2)
         get_effort(jsonData_0, jsonData_1, args.plot_effort, 50,
                    int(args.plot_joint_num))
