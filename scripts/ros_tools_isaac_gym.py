@@ -10,10 +10,8 @@ import argparse
 time_test = 20000
 time_started = 0
 
-robot_home_position = False
 
-
-def callback_check_home_position(joints):
+def callback_check_home_end_position(joints):
     joint_position = joints.position
     home_position = str(joint_position).split(',')
 
@@ -35,8 +33,6 @@ def callback_check_home_position(joints):
         if dif[i] > 0.1:
             home = False
 
-    global robot_home_position
-
     if not home:
         print("Not Home Position", flush=True, end="\r")
         save_json_data(joints)
@@ -57,7 +53,7 @@ def listener_ros_topics():
     jointStates_sub = message_filters.Subscriber('joint_states', JointState)
 
     ts = message_filters.TimeSynchronizer([jointStates_sub], 10)
-    ts.registerCallback(callback_check_home_position)
+    ts.registerCallback(callback_check_home_end_position)
     rospy.spin()
 
 
@@ -377,8 +373,7 @@ def read_json_data(json_data):
 
 
 def get_effort_sum(json_data, num_samples):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7", "joint_8"]
     effort = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
 
     for i in range(len(listOfJoints)):
@@ -441,6 +436,36 @@ def plot_effort(json_data_0, json_data_1, num_samples, joint_num):
     plt.show()
 
 
+def plot_position(json_data_0, json_data_1, num_samples, joint_num):
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
+    position_array_0 = np.empty(shape=(len(listOfJoints), num_samples - 1))
+    position_array_0.fill(0)
+
+    position_array_1 = np.empty(shape=(len(listOfJoints), num_samples - 1))
+    position_array_1.fill(0)
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, num_samples):
+            position_array_0[i][j - 1] = json_data_0["frames"][j][listOfJoints[i]]["position"]
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, num_samples):
+            position_array_1[i][j - 1] = json_data_1["frames"][j][listOfJoints[i]]["position"]
+
+    plt.plot(position_array_0[joint_num])
+    plt.plot(position_array_1[joint_num])
+
+    plt.title(listOfJoints[joint_num])
+
+    plt.xlabel("Number of Epochs")
+    plt.ylabel("Position (Radius)")
+
+    plt.legend(["Initial State", "Optimized State"], loc="lower right")
+    plt.show()
+
+    
 def get_multiple_angular_acceleration(json_data_0, json_data_1, num_samples, joint_num):
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
@@ -522,6 +547,11 @@ if __name__ == '__main__':
                         required=False, default="0")
     parser.add_argument('--plot_effort', help='Plot the effort.',
                         required=False, default=False)
+    parser.add_argument('--get_effort_sum', help='Get the sum of torque for each joint.',
+                        required=False, default=False)
+    parser.add_argument('--plot_position', help='Plot the position of each individual joint'
+                                                '.',
+                        required=False, default=False)
     parser.add_argument('--num_samples', help='Number of samples to plot.',
                         required=False, default="300")
 
@@ -539,10 +569,10 @@ if __name__ == '__main__':
     if args.get_angular_acc_sum:
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
-        ang_acceleration_1 = get_angular_acceleration(jsonData_1, 100)
-        ang_acceleration_2 = get_angular_acceleration(jsonData_2, 100)
-        acc_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, 100)
-        acc_sum_2 = get_angular_acceleration_sum(ang_acceleration_2, 100)
+        ang_acceleration_1 = get_angular_acceleration(jsonData_1, int(args.num_samples))
+        ang_acceleration_2 = get_angular_acceleration(jsonData_2, int(args.num_samples))
+        acc_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, int(args.num_samples))
+        acc_sum_2 = get_angular_acceleration_sum(ang_acceleration_2, int(args.num_samples))
 
         print("Angular acceleration ini: ")
         print(acc_sum_1)
@@ -552,9 +582,25 @@ if __name__ == '__main__':
     if args.plot_acc:
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
-        get_multiple_angular_acceleration(jsonData_1, jsonData_2, 200, int(args.joint_num))
+        get_multiple_angular_acceleration(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
 
     if args.plot_effort:
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
-        plot_effort(jsonData_1, jsonData_2, 300, int(args.joint_num))
+        plot_effort(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
+
+    if args.get_effort_sum:
+        jsonData_1 = read_json_data(json_file_1)
+        jsonData_2 = read_json_data(json_file_2)
+        eff_sum_1 = get_effort_sum(jsonData_1, int(args.num_samples))
+        eff_sum_2 = get_effort_sum(jsonData_2, int(args.joint_num))
+
+        print("Torque ini: ")
+        print(eff_sum_1)
+        print("Torque end: ")
+        print(eff_sum_2)
+
+    if args.plot_position:
+        jsonData_1 = read_json_data(json_file_1)
+        jsonData_2 = read_json_data(json_file_2)
+        plot_position(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
