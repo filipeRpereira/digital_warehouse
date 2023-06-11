@@ -10,15 +10,20 @@ env:
   #episodeLength: 300
   episodeLength: 320
   enableDebugVis: False
+  enableRos: True
 
   clipObservations: 5.0
   clipActions: 1.0
 
-  startPositionNoise: 0.25  # 0.0
-  startRotationNoise: 0.785 # 0.0
+  randomCubeABPosition: False
+  startPositionNoise: 0.25
+  startRotationNoise: 0.785
   frankaPositionNoise: 0.0
   frankaRotationNoise: 0.0
-  frankaDofNoise: 0.25      # 0.0
+  frankaDofNoise: 0.25
+
+  cubeACoordinates: [0.1, 0.3]
+  cubeBCoordinates: [0.15, -0.3]
 
   aggregateMode: 3
 

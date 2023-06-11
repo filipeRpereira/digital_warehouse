@@ -52,14 +52,13 @@ from moveit_msgs.msg import MoveItErrorCodes
 from std_msgs.msg import Header
 import std_msgs.msg
 
-# rospy.init_node("isaac_gym", anonymous=False)
-# joint_command_isaac = JointState()
-# pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
+rospy.init_node("isaac_gym", anonymous=False)
+joint_command_isaac = JointState()
+pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
 
-# pos = rospy.Publisher("/cube_A_pose", Pose, queue_size=20)
+pos = rospy.Publisher("/cube_A_pose", Pose, queue_size=20)
 
-fraka_id = 143
-
+fraka_id = 11
 
 @torch.jit.script
 def axisangle2quat(vec, eps=1e-6):
@@ -104,16 +103,28 @@ class FrankaCubeStack(VecTask):
         self.torque_total = torch.zeros(512, 9).to('cuda')
 
         self.max_episode_length = self.cfg["env"]["episodeLength"]
-
         self.action_scale = self.cfg["env"]["actionScale"]
-        self.start_position_noise = self.cfg["env"]["startPositionNoise"]
-        self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
-        self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
-        self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
-        self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+        self.enable_ros = self.cfg["env"]["enableRos"]
         self.aggregate_mode = self.cfg["env"]["aggregateMode"]
+        self.random_cubes_position = self.cfg["env"]["randomCubeABPosition"]
+
+        if self.random_cubes_position:
+            self.start_position_noise = self.cfg["env"]["startPositionNoise"]
+            self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
+            self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
+            self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
+            self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+        else:
+            self.start_position_noise = 0.0
+            self.start_rotation_noise = 0.0
+            self.franka_position_noise = 0.0
+            self.franka_rotation_noise = 0.0
+            self.franka_dof_noise = 0.0
 
         self.enable_find_highest_reward = self.cfg["env"]["enableFindHighestReward"]
+        self.cube_A_coordinates = self.cfg["env"]["cubeACoordinates"]
+        self.cube_B_coordinates = self.cfg["env"]["cubeBCoordinates"]
+
 
         # Create dicts to pass to reward function
         self.reward_settings = {
@@ -188,7 +199,6 @@ class FrankaCubeStack(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
-            # [0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
             [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
 
         # OSC Gains
@@ -591,6 +601,7 @@ class FrankaCubeStack(VecTask):
             check_valid (bool): Whether to make sure sampled position is collision-free with the other cube.
         """
         # If env_ids is None, we reset all the envs
+        # If env_ids is None, we reset all the envs
         if env_ids is None:
             env_ids = torch.arange(start=0, end=self.num_envs, device=self.device, dtype=torch.long)
 
@@ -599,14 +610,20 @@ class FrankaCubeStack(VecTask):
         sampled_cube_state = torch.zeros(num_resets, 13, device=self.device)
 
         # Get correct references depending on which one was selected
+        centered_cube_xy_state = torch.tensor(self._table_surface_pos[:2], device=self.device, dtype=torch.float32)
+
         if cube.lower() == 'a':
             this_cube_state_all = self._init_cubeA_state
             other_cube_state = self._init_cubeB_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
+            if not self.random_cubes_position:
+                centered_cube_xy_state = torch.tensor(self.cube_A_coordinates, device=self.device, dtype=torch.float32)
         elif cube.lower() == 'b':
             this_cube_state_all = self._init_cubeB_state
             other_cube_state = self._init_cubeA_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
+            if not self.random_cubes_position:
+                centered_cube_xy_state = torch.tensor(self.cube_B_coordinates, device=self.device, dtype=torch.float32)
         else:
             raise ValueError(f"Invalid cube specified, options are 'A' and 'B'; got: {cube}")
 
@@ -614,10 +631,7 @@ class FrankaCubeStack(VecTask):
         min_dists = (self.states["cubeA_size"] + self.states["cubeB_size"])[env_ids] * np.sqrt(2) / 2.0
 
         # We scale the min dist by 2 so that the cubes aren't too close together
-        min_dists = min_dists * 2.0
-
-        # Sampling is "centered" around middle of table
-        centered_cube_xy_state = torch.tensor(self._table_surface_pos[:2], device=self.device, dtype=torch.float32)
+        min_dists = 0.2  # min_dists * 2.0
 
         # Set z value, which is fixed height
         sampled_cube_state[:, 2] = self._table_surface_pos[2] + cube_heights.squeeze(-1)[env_ids] / 2
@@ -718,7 +732,8 @@ class FrankaCubeStack(VecTask):
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
 
-        self.get_joints_values(fraka_id)
+        if self.enable_ros:
+            self.get_joints_values(fraka_id)
 
     def post_physics_step(self):
         self.progress_buf += 1
@@ -793,7 +808,6 @@ class FrankaCubeStack(VecTask):
             gripper_state_effort = np.array(self._gripper_control[env_num, i].item())
             effort.append(gripper_state_effort)
 
-        '''
         joint_command_isaac.header.stamp = rospy.Time.now()
         joint_command_isaac.header.frame_id = "Isaac Gym"
         joint_command_isaac.name = joint_names
@@ -812,7 +826,6 @@ class FrankaCubeStack(VecTask):
         p.orientation.z = self.states["cubeA_quat"][fraka_id][2]
         p.orientation.w = self.states["cubeA_quat"][fraka_id][3]
         pos.publish(p)
-        '''
 
     def find_max_reward(self):
         print("______________________________________")
