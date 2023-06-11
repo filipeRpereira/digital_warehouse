@@ -25,6 +25,7 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 import copy
 
 import numpy as np
@@ -51,11 +52,10 @@ from moveit_msgs.msg import MoveItErrorCodes
 from std_msgs.msg import Header
 import std_msgs.msg
 
-
 rospy.init_node("isaac_gym", anonymous=False)
 joint_command_isaac = JointState()
 pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
-
+pos = rospy.Publisher("/cube_A_pose", Pose, queue_size=20)
 
 @torch.jit.script
 def axisangle2quat(vec, eps=1e-6):
@@ -100,21 +100,49 @@ class FrankaCubeStack(VecTask):
         self.torque_total = torch.zeros(512, 9).to('cuda')
 
         self.max_episode_length = self.cfg["env"]["episodeLength"]
-
         self.action_scale = self.cfg["env"]["actionScale"]
-        self.start_position_noise = self.cfg["env"]["startPositionNoise"]
-        self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
-        self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
-        self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
-        self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+        self.enable_ros = self.cfg["env"]["enableRos"]
         self.aggregate_mode = self.cfg["env"]["aggregateMode"]
+        self.random_cubes_position = self.cfg["env"]["randomCubeABPosition"]
+        self.just_one_test = self.cfg["env"]["justOneTest"]
+
+        if self.random_cubes_position:
+            self.start_position_noise = self.cfg["env"]["startPositionNoise"]
+            self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
+            self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
+            self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
+            self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+        else:
+            self.start_position_noise = 0.0
+            self.start_rotation_noise = 0.0
+            self.franka_position_noise = 0.0
+            self.franka_rotation_noise = 0.0
+            self.franka_dof_noise = 0.0
+
+        self.enable_find_highest_reward = self.cfg["env"]["enableFindHighestReward"]
+        self.cube_A_coordinates = self.cfg["env"]["cubeACoordinates"]
+        self.cube_B_coordinates = self.cfg["env"]["cubeBCoordinates"]
+
 
         # Create dicts to pass to reward function
         self.reward_settings = {
+            "franka_id": self.cfg["env"]["frankaId"],
             "r_dist_scale": self.cfg["env"]["distRewardScale"],
             "r_lift_scale": self.cfg["env"]["liftRewardScale"],
             "r_align_scale": self.cfg["env"]["alignRewardScale"],
             "r_stack_scale": self.cfg["env"]["stackRewardScale"],
+
+            "r_cycleTime_scale": self.cfg["env"]["cycleTimeRewardScale"],
+            "r_joint0_scale": self.cfg["env"]["torqueJoint0RewardScale"],
+            "r_joint1_scale": self.cfg["env"]["torqueJoint1RewardScale"],
+            "r_joint2_scale": self.cfg["env"]["torqueJoint2RewardScale"],
+            "r_joint3_scale": self.cfg["env"]["torqueJoint3RewardScale"],
+            "r_joint4_scale": self.cfg["env"]["torqueJoint4RewardScale"],
+            "r_joint5_scale": self.cfg["env"]["torqueJoint5RewardScale"],
+            "r_joint6_scale": self.cfg["env"]["torqueJoint6RewardScale"],
+
+            "enable_cycle_time_reward": self.cfg["env"]["enableCycleTimeReward"],
+            "enable_torque_reward": self.cfg["env"]["enableTorqueReward"],
         }
 
         # Controller type
@@ -170,7 +198,6 @@ class FrankaCubeStack(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
-            # [0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
             [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
 
         # OSC Gains
@@ -245,8 +272,7 @@ class FrankaCubeStack(VecTask):
         table_stand_opts.fix_base_link = True
         table_stand_asset = self.gym.create_box(self.sim, *[0.2, 0.2, table_stand_height], table_opts)
 
-
-        wall_height = 0.00
+        wall_height = 0.0
         wall_pos = [0.1, 0.1, 1.0 + table_thickness / 2 + wall_height / 2]
         wall_opts = gymapi.AssetOptions()
         wall_opts.fix_base_link = True
@@ -254,7 +280,6 @@ class FrankaCubeStack(VecTask):
 
         self.cubeA_size = 0.050
         self.cubeB_size = 0.070
-        # self.cubeB_size = 0.200
 
         # Create cubeA asset
         cubeA_opts = gymapi.AssetOptions()
@@ -264,7 +289,6 @@ class FrankaCubeStack(VecTask):
         # Create cubeB asset
         cubeB_opts = gymapi.AssetOptions()
         cubeB_asset = self.gym.create_box(self.sim, *([self.cubeB_size] * 3), cubeB_opts)
-        # cubeB_asset = self.gym.create_box(self.sim, *([0.05, 0.05, self.cubeB_size]), cubeB_opts)
         cubeB_color = gymapi.Vec3(0.0, 0.4, 0.1)
 
         self.num_franka_bodies = self.gym.get_asset_rigid_body_count(franka_asset)
@@ -323,10 +347,10 @@ class FrankaCubeStack(VecTask):
 
         # Define start pose for cubes (doesn't really matter since they're get overridden during reset() anyways)
         cubeA_start_pose = gymapi.Transform()
-        cubeA_start_pose.p = gymapi.Vec3(0.1, 0.1, 0.0)
+        cubeA_start_pose.p = gymapi.Vec3(-1.0, 0.0, 0.0)
         cubeA_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
         cubeB_start_pose = gymapi.Transform()
-        cubeB_start_pose.p = gymapi.Vec3(0.2, -0.3, 0.0)
+        cubeB_start_pose.p = gymapi.Vec3(1.0, 0.0, 0.0)
         cubeB_start_pose.r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
 
         # compute aggregate size
@@ -369,6 +393,7 @@ class FrankaCubeStack(VecTask):
             table_actor = self.gym.create_actor(env_ptr, table_asset, table_start_pose, "table", i, 1, 0)
             table_stand_actor = self.gym.create_actor(env_ptr, table_stand_asset, table_stand_start_pose, "table_stand",
                                                       i, 1, 0)
+
             wall_actor = self.gym.create_actor(env_ptr, wall_asset, wall_start_pose, "wall", i, 1, 0)
 
             if self.aggregate_mode == 1:
@@ -510,8 +535,8 @@ class FrankaCubeStack(VecTask):
 
         # Reset cubes, sampling cube B first, then A
         # if not self._i:
-        self._reset_init_cube_state(cube='B', env_ids=env_ids, check_valid=True)
-        self._reset_init_cube_state(cube='A', env_ids=env_ids, check_valid=False)
+        self._reset_init_cube_state(cube='B', env_ids=env_ids, check_valid=False)
+        self._reset_init_cube_state(cube='A', env_ids=env_ids, check_valid=True)
         # self._i = True
 
         # Write these new init states to the sim states
@@ -575,6 +600,7 @@ class FrankaCubeStack(VecTask):
             check_valid (bool): Whether to make sure sampled position is collision-free with the other cube.
         """
         # If env_ids is None, we reset all the envs
+        # If env_ids is None, we reset all the envs
         if env_ids is None:
             env_ids = torch.arange(start=0, end=self.num_envs, device=self.device, dtype=torch.long)
 
@@ -583,20 +609,20 @@ class FrankaCubeStack(VecTask):
         sampled_cube_state = torch.zeros(num_resets, 13, device=self.device)
 
         # Get correct references depending on which one was selected
+        centered_cube_xy_state = torch.tensor(self._table_surface_pos[:2], device=self.device, dtype=torch.float32)
+
         if cube.lower() == 'a':
             this_cube_state_all = self._init_cubeA_state
             other_cube_state = self._init_cubeB_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
-            centered_cube_xy_state = torch.tensor([0.1, 0.3], device=self.device, dtype=torch.float32)
-            # sampled_cube_state[:, 0] = 0.1
-            # sampled_cube_state[:, 1] = 0.1
+            if not self.random_cubes_position:
+                centered_cube_xy_state = torch.tensor(self.cube_A_coordinates, device=self.device, dtype=torch.float32)
         elif cube.lower() == 'b':
             this_cube_state_all = self._init_cubeB_state
             other_cube_state = self._init_cubeA_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
-            centered_cube_xy_state = torch.tensor([0.15, -0.3], device=self.device, dtype=torch.float32)
-            # sampled_cube_state[:, 0] = 0.2
-            # sampled_cube_state[:, 1] = -0.3
+            if not self.random_cubes_position:
+                centered_cube_xy_state = torch.tensor(self.cube_B_coordinates, device=self.device, dtype=torch.float32)
         else:
             raise ValueError(f"Invalid cube specified, options are 'A' and 'B'; got: {cube}")
 
@@ -612,7 +638,6 @@ class FrankaCubeStack(VecTask):
         # Initialize rotation, which is no rotation (quat w = 1)
         sampled_cube_state[:, 6] = 1.0
 
-        # '''
         # If we're verifying valid sampling, we need to check and re-sample if any are not collision-free
         # We use a simple heuristic of checking based on cubes' radius to determine if a collision would occur
         if check_valid:
@@ -646,7 +671,7 @@ class FrankaCubeStack(VecTask):
             aa_rot = torch.zeros(num_resets, 3, device=self.device)
             aa_rot[:, 2] = 2.0 * self.start_rotation_noise * (torch.rand(num_resets, device=self.device) - 0.5)
             sampled_cube_state[:, 3:7] = quat_mul(axisangle2quat(aa_rot), sampled_cube_state[:, 3:7])
-        # '''
+
         # Lastly, set these sampled values as the new init state
         this_cube_state_all[env_ids, :] = sampled_cube_state
 
@@ -706,18 +731,21 @@ class FrankaCubeStack(VecTask):
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
 
-        self.get_joints_values(250)
+        if self.enable_ros:
+            self.get_joints_values(int(self.reward_settings["franka_id"]))
 
     def post_physics_step(self):
         self.progress_buf += 1
-
-        if self.progress_buf[250] > 319:
+        fraka_id = int(self.reward_settings["franka_id"])
+        if self.just_one_test and self.progress_buf[fraka_id].item() > self.max_episode_length - 1:
             exit()
 
         env_ids = self.reset_buf.nonzero(as_tuple=False).squeeze(-1)
-
         if len(env_ids) > 0:
             self.reset_idx(env_ids)
+
+            if self.enable_find_highest_reward:
+                self.find_max_reward()
 
         self.compute_observations()
         self.compute_reward(self.actions)
@@ -790,10 +818,30 @@ class FrankaCubeStack(VecTask):
         joint_command_isaac.effort = effort
         pub.publish(joint_command_isaac)
 
+        fraka_id = int(self.reward_settings["franka_id"])
+        p = Pose()
+        p.position.x = self.states["cubeA_pos"][fraka_id][0]
+        p.position.y = self.states["cubeA_pos"][fraka_id][1]
+        p.position.z = self.states["cubeA_pos"][fraka_id][2]
+        # Make sure the quaternion is valid and normalized
+        p.orientation.x = self.states["cubeA_quat"][fraka_id][0]
+        p.orientation.y = self.states["cubeA_quat"][fraka_id][1]
+        p.orientation.z = self.states["cubeA_quat"][fraka_id][2]
+        p.orientation.w = self.states["cubeA_quat"][fraka_id][3]
+        pos.publish(p)
+
+    def find_max_reward(self):
+        print("______________________________________")
+        max_reward = torch.max(self.rew_buf).item()
+        max_index = torch.argmax(self.rew_buf).item()
+        print("MAX REWARD: " + str(max_reward) + " | INDEX: " + str(max_index))
+        print("______________________________________")
+
 
 #####################################################################
 ###=========================jit functions=========================###
 #####################################################################
+
 
 @torch.jit.script
 def compute_franka_reward(
@@ -840,18 +888,17 @@ def compute_franka_reward(
     cycle_time_new = torch.where((progress_buf < 50), torch.zeros_like(cycle_time_new), cycle_time_new)
     # print("cycle_time_new: ", cycle_time_new[0:10])
 
-    fraka_id = 10
     # torque
     new_torque = abs(torque) + abs(effort_control)
-    #'''
-    new_torque[:, 0] = torch.where(end_point, abs(torque[:, 0]),  new_torque[:, 0])
-    new_torque[:, 1] = torch.where(end_point, abs(torque[:, 1]),  new_torque[:, 0])
-    new_torque[:, 2] = torch.where(end_point, abs(torque[:, 2]),  new_torque[:, 0])
-    new_torque[:, 3] = torch.where(end_point, abs(torque[:, 3]),  new_torque[:, 0])
-    new_torque[:, 4] = torch.where(end_point, abs(torque[:, 4]),  new_torque[:, 0])
-    new_torque[:, 5] = torch.where(end_point, abs(torque[:, 5]),  new_torque[:, 0])
-    new_torque[:, 6] = torch.where(end_point, abs(torque[:, 6]),  new_torque[:, 0])
-    #'''
+    # '''
+    new_torque[:, 0] = torch.where(end_point, abs(torque[:, 0]), new_torque[:, 0])
+    new_torque[:, 1] = torch.where(end_point, abs(torque[:, 1]), new_torque[:, 0])
+    new_torque[:, 2] = torch.where(end_point, abs(torque[:, 2]), new_torque[:, 0])
+    new_torque[:, 3] = torch.where(end_point, abs(torque[:, 3]), new_torque[:, 0])
+    new_torque[:, 4] = torch.where(end_point, abs(torque[:, 4]), new_torque[:, 0])
+    new_torque[:, 5] = torch.where(end_point, abs(torque[:, 5]), new_torque[:, 0])
+    new_torque[:, 6] = torch.where(end_point, abs(torque[:, 6]), new_torque[:, 0])
+    # '''
     new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
     new_torque[:, 2] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 2]), new_torque[:, 2])
@@ -887,27 +934,30 @@ def compute_franka_reward(
     rewards = reward_settings["r_dist_scale"] * dist_reward + \
               reward_settings["r_lift_scale"] * lift_reward + \
               reward_settings["r_align_scale"] * align_reward + \
-              cycle_time_new + \
-              0.3 * reward_torque_joint_0 * end_point + \
-              0.3 * reward_torque_joint_1 * end_point + \
-              0.2 * reward_torque_joint_2 * end_point + \
-              0.1 * reward_torque_joint_3 * end_point + \
-              0.05 * reward_torque_joint_4 * end_point + \
-              0.03 * reward_torque_joint_5 * end_point + \
-              0.02 * reward_torque_joint_6 * end_point
+              reward_settings["r_cycleTime_scale"] * cycle_time_new * \
+              reward_settings["enable_cycle_time_reward"] + \
+              (reward_settings["r_joint0_scale"] * reward_torque_joint_0 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_1 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_2 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_3 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_4 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_5 +
+               reward_settings["r_joint0_scale"] * reward_torque_joint_6) * \
+              reward_settings["enable_torque_reward"] * end_point
 
     # We either provide the stack reward or the align + dist reward
     rewards = torch.where(stack_reward, reward_settings["r_stack_scale"] * stack_reward, rewards)
-    # '''
-    print("progress_buf   : ", progress_buf[fraka_id].item())
-    print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
-    print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
-    print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
-    #print("end point      : ", end_point[fraka_id].item())
-    print("cycle_time     : ", cycle_time_new[fraka_id].item())
-    print("torque_total   : ", torque_total_metric[fraka_id].item())
-    #print(states["cubeA_initial_pos"][250])
-    # '''
+    fraka_id = int(reward_settings["franka_id"])
+
+    if progress_buf[fraka_id].item() > max_episode_length - 2:
+        print("-------------------------------------------------------------")
+        print("progress_buf   : ", progress_buf[fraka_id].item())
+        # print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
+        # print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
+        # print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
+        # print("end point      : ", end_point[fraka_id].item())
+        print("cycle_time     : ", cycle_time_new[fraka_id].item())
+        print("torque_total   : ", torque_total_metric[fraka_id].item())
 
     '''
     print("torque_joint_0 : ", (0.3 * reward_torque_joint_0[fraka_id] * end_point[fraka_id]).item())
@@ -919,22 +969,19 @@ def compute_franka_reward(
     print("torque_joint_6 : ", (0.02 * reward_torque_joint_6[fraka_id] * end_point[fraka_id]).item())
     '''
 
-    # rewards = torch.where(gripper_open_after_dropoff, gripper_open_after_dropoff + 10, rewards)
+    best_result = torch.where(progress_buf >= max_episode_length - 1, rewards, torch.ones_like(rewards))
 
     # penalty
+    # gripper is closed without cube A
+    d_lf_rf = torch.norm(states["eef_rf_pos"] - states["eef_lf_pos"], dim=-1)
+    gripper_closed_without_cube = (d_lf_rf < 0.02)
+    rewards = torch.where(gripper_closed_without_cube, rewards * 0.1, rewards)
 
-    # cubeA_lifted
-    #dif_cubeA_initial_actual_pos = abs(states["cubeA_pos"][:, 0] - states["cubeA_initial_pos"][:, 0])
-    #cubeA_dragged = (dif_cubeA_initial_actual_pos > 0.0001) & (cubeA_lifted < 1)
-    #rewards = torch.where(cubeA_dragged, torch.ones_like(rewards) * -1, rewards)
-
+    # cube B is not in original position
     rewards = torch.where(cubeB_in_position, rewards, torch.ones_like(rewards) * -1)
 
-    #fraka_too_far = ((align_reward[fraka_id] < 0.00001) & cubeA_lifted)
-    #rewards = torch.where(fraka_too_far, rewards * 0.5, rewards)
-
-    print("reward         : ", rewards[fraka_id].item())
-
+    if progress_buf[fraka_id].item() > max_episode_length - 2:
+        print("reward         : ", rewards[fraka_id].item())
 
     # Compute resets
     reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf),

@@ -7,10 +7,10 @@ physics_engine: ${..physics_engine}
 env:
   numEnvs: ${resolve_default:8192,${...num_envs}}
   envSpacing: 1.5
-  #episodeLength: 300
   episodeLength: 320
   enableDebugVis: False
   enableRos: True
+  justOneTest: True
 
   clipObservations: 5.0
   clipActions: 1.0
@@ -28,6 +28,7 @@ env:
   aggregateMode: 3
 
   enableFindHighestReward: False
+  frankaId: 11
 
   # *** reward function scales ***
   enableCycleTimeReward: 0.0
