@@ -2,44 +2,49 @@
 ## A Path Optimization Algorithm for Industrial Robots Using Deep Reinforcement Learning
 ![Warehouse_image.png](Images%2FWarehouse_image.png)
 ### About this repository
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a finibus orci, pulvinar luctus arcu. Praesent pharetra 
-condimentum est sit amet molestie. Suspendisse efficitur cursus interdum. Mauris ac justo id libero cursus auctor 
-vitae vel lacus. Nam egestas ac mi eu viverra. In a neque nulla. Praesent sed lectus sollicitudin, vehicula est sit 
-amet, elementum neque. Integer et lorem accumsan, faucibus nulla quis, imperdiet libero. Curabitur efficitur faucibus 
-nunc. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Nam interdum dolor massa, 
-nec accumsan augue aliquet vitae. Maecenas ac ipsum finibus, commodo dolor vel, ullamcorper leo. Ut id blandit urna. 
-Suspendisse sapien sem, mattis semper mi in, ullamcorper commodo dui. Maecenas at pellentesque magna, sodales pretium 
-odio. Praesent lacinia aliquam augue at ornare.
+Energy efficiency has become an increasingly relevant concern in the industry, with the aim of reducing environmental 
+impact and operating costs. In this work, energy consumption optimization solutions are presented in robotic arms 
+during the execution of their tasks. The objective is to reduce the energy consumption of industrial robots, taking 
+into account the importance of energy efficiency in the current context, where sustainability and the reduction of 
+carbon emissions are priority topics.
 
-Aliquam dignissim lacinia volutpat. Morbi tincidunt quis enim et semper. Donec eget finibus orci, vestibulum posuere 
-nulla. Vivamus placerat tincidunt purus, eget accumsan leo pharetra non. Mauris eget vestibulum est. Proin tempor 
-ipsum at sapien dictum, at finibus arcu ultricies. Praesent dignissim non elit vel tristique. Cras id vestibulum risus. 
-Vivamus velit magna, dapibus in accumsan in, blandit eu eros. Aliquam maximus venenatis sem, ut porttitor sapien 
-hendrerit eget. Nulla ullamcorper vestibulum nisi a eleifend. Maecenas fringilla congue nulla feugiat lobortis.
+To achieve this goal, reinforcement learning algorithms will be used, a Machine Learning approach that allows robots 
+to learn and adapt to the best strategies to optimize their tasks, taking into account energy consumption. 
+Through this learning process, it is expected to find the most efficient configurations and behaviors to reduce energy 
+consumption, maintaining the quality and effectiveness of the tasks performed by the robotic arms.
+
+The implementation of the proposed solution will be carried out using the Isaac Sim and Isaac Gym simulation platforms, 
+together with the ROS framework (Robot Operating System). These tools will provide a suitable virtual environment for 
+the development and testing of energy optimization strategies, allowing the performance evaluation and validation of
+the obtained results.
+
+Through the solution found in this work, it was possible to optimize pick-and-place tasks performed by an industrial 
+robotic arm. It was possible to demonstrate that it is possible to obtain significant gains with 
+reinforcement learning solutions without compromising the correct execution and without harming the productivity of 
+the robotic arm.
 
 ### Installation
 Here you can find the packages and software that will be necessary to run this project.
 #### Miniconda
-[website](https://docs.conda.io/en/latest/miniconda_hashes.html)
+[website](https://docs.conda.io/en/latest/miniconda_hashes.html)\
+It is important to install miniconda to install Isac Gym.
 
 #### Isaac Gym Preview 4
-Download the Isaac Gym Preview 4 release from the [website](https://developer.nvidia.com/isaac-gym), then
-follow the installation instructions in the documentation. We highly recommend using a conda environment 
-to simplify set up.
+[website](https://developer.nvidia.com/isaac-gym)\
+Download the Isaac Gym Preview 4, then follow the installation instructions in the documentation. 
 
 #### Isaac Gym Benchmark Environments
 [website](https://github.com/NVIDIA-Omniverse/IsaacGymEnvs)\
 Once Isaac Gym is installed and samples work within your current python environment, install this repo:
 
-```bash
-pip install -e .
-```
 
 #### Isaac Sim
-[website](https://developer.nvidia.com/isaac-sim/download)
+[website](https://developer.nvidia.com/isaac-sim/download)\
+In this link, you will find the download file.
 
 #### Tensorboard
-`$ pip install tensorboard`
+`$ pip install tensorboard`\
+To install the Tensorboard in Ubuntu, execute the command line above.
 
 #### ROS
 [website](http://wiki.ros.org/Installation/Ubuntu)
@@ -97,13 +102,18 @@ initial results.
 ## Tasks Results
 ### Task 1
 The first task is to place a cube on top of another cube.
+Here is possible see the first teste, without any optimization.
 ![task_1_fase_0.gif](Images%2Ftask_1_fase_0.gif)
+
+In this case, you can see the final result with optimization of cycle time and energy consumption.\
+The way the robotic arm chose the path to place one cube on top of the other is very interesting.\
+As you can see, halfway through, the cube is on the table, because that way,
+the torque at each joint will be less.
 
 ![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
 
 #### Results 
 In the table bellow, are presented the results for each test for the task 1.
-
 
 | Test nº | Metric            | Initial | Optimization | Gain |
 |---------|-------------------|---------|--------------|------|
@@ -120,6 +130,8 @@ In the table bellow, are presented the results for each test for the task 1.
 The second task is to place a cube on top of another cube, but this time, there is a barrier between the two cubes.
 ![task_2_fase_0.gif](Images%2Ftask_2_fase_0.gif)
 
+In this test, the results are similar to task 1. As you can see, until the cube hits the barrier, it is on the table.\
+Again, this shows that the torque at each joint is less this way.
 ![task_2_fase_2.gif](Images%2Ftask_2_fase_2.gif)
 
 #### Results 
