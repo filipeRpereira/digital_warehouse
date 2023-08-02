@@ -113,11 +113,11 @@ class FrankaCubeStack(VecTask):
             self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
             self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
         else:
-            self.start_position_noise = 0.0
-            self.start_rotation_noise = 0.0
+            self.start_position_noise = 0.0 #0.10
+            self.start_rotation_noise = 0.0 #0.785
             self.franka_position_noise = 0.0
             self.franka_rotation_noise = 0.0
-            self.franka_dof_noise = 0.0
+            self.franka_dof_noise = 0.0 #0.525
 
         self.enable_find_highest_reward = self.cfg["env"]["enableFindHighestReward"]
         self.cube_A_coordinates = self.cfg["env"]["cubeACoordinates"]
@@ -198,6 +198,7 @@ class FrankaCubeStack(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
+            #[0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
             [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
 
         # OSC Gains
@@ -587,18 +588,6 @@ class FrankaCubeStack(VecTask):
         self.reset_buf[env_ids] = 0
 
     def _reset_init_cube_state(self, cube, env_ids, check_valid=True):
-        """
-        Simple method to sample @cube's position based on self.startPositionNoise and self.startRotationNoise, and
-        automaticlly reset the pose internally. Populates the appropriate self._init_cubeX_state
-
-        If @check_valid is True, then this will also make sure that the sampled position is not in contact with the
-        other cube.
-
-        Args:
-            cube(str): Which cube to sample location for. Either 'A' or 'B'
-            env_ids (tensor or None): Specific environments to reset cube for
-            check_valid (bool): Whether to make sure sampled position is collision-free with the other cube.
-        """
         # If env_ids is None, we reset all the envs
         # If env_ids is None, we reset all the envs
         if env_ids is None:
@@ -945,6 +934,7 @@ def compute_franka_reward(
                reward_settings["r_joint0_scale"] * reward_torque_joint_6) * \
               reward_settings["enable_torque_reward"] * end_point
 
+
     # We either provide the stack reward or the align + dist reward
     rewards = torch.where(stack_reward, reward_settings["r_stack_scale"] * stack_reward, rewards)
     fraka_id = int(reward_settings["franka_id"])
@@ -952,33 +942,23 @@ def compute_franka_reward(
     if progress_buf[fraka_id].item() > max_episode_length - 2:
         print("-------------------------------------------------------------")
         print("progress_buf   : ", progress_buf[fraka_id].item())
-        # print("dist_reward    : ", reward_settings["r_dist_scale"] * dist_reward[fraka_id].item())
-        # print("lift_reward    : ", reward_settings["r_lift_scale"] * lift_reward[fraka_id].item())
-        # print("align_reward   : ", reward_settings["r_align_scale"] * align_reward[fraka_id].item())
-        # print("end point      : ", end_point[fraka_id].item())
         print("cycle_time     : ", cycle_time_new[fraka_id].item())
         print("torque_total   : ", torque_total_metric[fraka_id].item())
-
-    '''
-    print("torque_joint_0 : ", (0.3 * reward_torque_joint_0[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_1 : ", (0.3 * reward_torque_joint_1[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_2 : ", (0.2 * reward_torque_joint_2[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_3 : ", (0.1 * reward_torque_joint_3[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_4 : ", (0.05 * reward_torque_joint_4[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_5 : ", (0.03 * reward_torque_joint_5[fraka_id] * end_point[fraka_id]).item())
-    print("torque_joint_6 : ", (0.02 * reward_torque_joint_6[fraka_id] * end_point[fraka_id]).item())
-    '''
 
     best_result = torch.where(progress_buf >= max_episode_length - 1, rewards, torch.ones_like(rewards))
 
     # penalty
     # gripper is closed without cube A
-    d_lf_rf = torch.norm(states["eef_rf_pos"] - states["eef_lf_pos"], dim=-1)
-    gripper_closed_without_cube = (d_lf_rf < 0.02)
-    rewards = torch.where(gripper_closed_without_cube, rewards * 0.1, rewards)
+    #d_lf_rf = torch.norm(states["eef_rf_pos"] - states["eef_lf_pos"], dim=-1)
+    #gripper_closed_without_cube = (d_lf_rf < 0.02)
+    #rewards = torch.where(gripper_closed_without_cube, rewards * 0.1, rewards)
 
     # cube B is not in original position
     rewards = torch.where(cubeB_in_position, rewards, torch.ones_like(rewards) * -1)
+
+    # Fraka is too far from cubo B
+    #fraka_too_far = ((align_reward[fraka_id] < 0.00001) & cubeA_lifted)
+    #rewards = torch.where(fraka_too_far, rewards * 0.5, rewards)
 
     if progress_buf[fraka_id].item() > max_episode_length - 2:
         print("reward         : ", rewards[fraka_id].item())

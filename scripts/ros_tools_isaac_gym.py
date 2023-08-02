@@ -534,9 +534,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
     parser.add_argument('--job_name_1', help='Save data from ROS topics.',
-                        required=False, default="Task_1_fase_0_isaac_gym")
+                        required=False, default="Task_1_gym_fase_0")
     parser.add_argument('--job_name_2', help='Save data from ROS topics.',
-                        required=False, default="Task_1_fase_2_isaac_gym")
+                        required=False, default="Task_1_gym_fase_2")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--get_angular_acc_sum', help='Get the sum of angular acceleration of each joint.',
@@ -549,8 +549,7 @@ if __name__ == '__main__':
                         required=False, default=False)
     parser.add_argument('--get_effort_sum', help='Get the sum of torque for each joint.',
                         required=False, default=False)
-    parser.add_argument('--plot_position', help='Plot the position of each individual joint'
-                                                '.',
+    parser.add_argument('--plot_position', help='Plot the position of each individual joint',
                         required=False, default=False)
     parser.add_argument('--num_samples', help='Number of samples to plot.',
                         required=False, default="300")

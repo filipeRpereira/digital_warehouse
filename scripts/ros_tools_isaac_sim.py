@@ -87,64 +87,91 @@ def listener_ros_topics():
 ## OK
 def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
                    imu_link_6, imu_link_7, imu_link_8):
+    joint_position_0 = data.position[0]
     joint_velocity_0 = data.velocity[0]
     joint_effort_0 = data.effort[0]
+    if str(joint_position_0) == "nan":
+        joint_position_0 = 0
     if str(joint_velocity_0) == "nan":
         joint_velocity_0 = 0
     if str(joint_effort_0) == "nan":
         joint_effort_0 = 0
 
+    joint_position_1 = data.position[1]
     joint_velocity_1 = data.velocity[1]
     joint_effort_1 = data.effort[1]
+    if str(joint_position_1) == "nan":
+        joint_position_1 = 0
     if str(joint_velocity_1) == "nan":
         joint_velocity_1 = 0
     if str(joint_effort_1) == "nan":
         joint_effort_1 = 0
 
+    joint_position_2 = data.position[2]
     joint_velocity_2 = data.velocity[2]
     joint_effort_2 = data.effort[2]
+    if str(joint_position_2) == "nan":
+        joint_position_2 = 0
     if str(joint_velocity_2) == "nan":
         joint_velocity_2 = 0
     if str(joint_effort_2) == "nan":
         joint_effort_2 = 0
 
+    joint_position_3 = data.position[3]
     joint_velocity_3 = data.velocity[3]
     joint_effort_3 = data.effort[3]
+    if str(joint_position_3) == "nan":
+        joint_position_3 = 0
     if str(joint_velocity_3) == "nan":
         joint_velocity_3 = 0
     if str(joint_effort_3) == "nan":
         joint_effort_3 = 0
 
+    joint_position_4 = data.position[4]
     joint_velocity_4 = data.velocity[4]
     joint_effort_4 = data.effort[4]
+    if str(joint_position_4) == "nan":
+        joint_position_4 = 0
     if str(joint_velocity_4) == "nan":
         joint_velocity_4 = 0
     if str(joint_effort_4) == "nan":
         joint_effort_4 = 0
 
+    joint_position_5 = data.position[5]
     joint_velocity_5 = data.velocity[5]
     joint_effort_5 = data.effort[5]
+    if str(joint_position_5) == "nan":
+        joint_position_5 = 0
     if str(joint_velocity_5) == "nan":
         joint_velocity_5 = 0
     if str(joint_effort_5) == "nan":
         joint_effort_5 = 0
 
+    joint_position_6 = data.position[6]
     joint_velocity_6 = data.velocity[6]
     joint_effort_6 = data.effort[6]
+    if str(joint_position_6) == "nan":
+        joint_position_6 = 0
     if str(joint_velocity_6) == "nan":
         joint_velocity_6 = 0
     if str(joint_effort_6) == "nan":
         joint_effort_6 = 0
 
+    joint_position_7 = data.position[7]
     joint_velocity_7 = data.velocity[7]
     joint_effort_7 = data.effort[7]
+    if str(joint_position_7) == "nan":
+        joint_position_7 = 0
     if str(joint_velocity_7) == "nan":
         joint_velocity_7 = 0
     if str(joint_effort_7) == "nan":
         joint_effort_7 = 0
 
+    joint_position_8 = data.position[8]
     joint_velocity_8 = data.velocity[8]
     joint_effort_8 = data.effort[8]
+    if str(joint_position_0) == "nan":
+        joint_position_8 = 0
     if str(joint_velocity_8) == "nan":
         joint_velocity_8 = 0
     if str(joint_effort_8) == "nan":
@@ -156,6 +183,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             "stamp": str(data.header.stamp)
         },
         "joint_0": {
+            "position": joint_position_0,
             "effort": joint_effort_0,
             "velocity": joint_velocity_0,
             "imu": {
@@ -177,6 +205,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_1": {
+            "position": joint_position_1,
             "effort": joint_effort_1,
             "velocity": joint_velocity_1,
             "imu": {
@@ -198,6 +227,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_2": {
+            "position": joint_position_2,
             "effort": joint_effort_2,
             "velocity": joint_velocity_2,
             "imu": {
@@ -219,6 +249,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_3": {
+            "position": joint_position_3,
             "effort": joint_effort_3,
             "velocity": joint_velocity_3,
             "imu": {
@@ -240,6 +271,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_4": {
+            "position": joint_position_4,
             "effort": joint_effort_4,
             "velocity": joint_velocity_4,
             "imu": {
@@ -261,6 +293,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_5": {
+            "position": joint_position_5,
             "effort": joint_effort_5,
             "velocity": joint_velocity_5,
             "imu": {
@@ -282,6 +315,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_6": {
+            "position": joint_position_6,
             "effort": joint_effort_6,
             "velocity": joint_velocity_6,
             "imu": {
@@ -303,6 +337,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_7": {
+            "position": joint_position_7,
             "effort": joint_effort_7,
             "velocity": joint_velocity_7,
             "imu": {
@@ -324,6 +359,7 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
             }
         },
         "joint_8": {
+            "position": joint_position_8,
             "effort": joint_effort_8,
             "velocity": joint_velocity_8,
             "imu": {
@@ -403,7 +439,7 @@ def plot_data(json_data):
         fig1.tight_layout()
         yLabel = "Linear Acceleration"
         for ax in axs1.flat:
-            ax.set(xlabel='samples', ylabel=yLabel)
+            ax.set(xlabel='ROS samples', ylabel=yLabel)
         for ax in axs1.flat:
             ax.label_outer()
         # plt.show()
@@ -429,7 +465,7 @@ def plot_data(json_data):
         fig2.tight_layout()
         yLabel = "Angular Velocity"
         for ax in axs1.flat:
-            ax.set(xlabel='samples', ylabel=yLabel)
+            ax.set(xlabel='ROS samples', ylabel=yLabel)
         for ax in axs1.flat:
             ax.label_outer()
         # plt.show()
@@ -455,7 +491,7 @@ def plot_data(json_data):
         fig3.tight_layout()
         yLabel = "Orientation"
         for ax in axs1.flat:
-            ax.set(xlabel='samples', ylabel=yLabel)
+            ax.set(xlabel='ROS samples', ylabel=yLabel)
         for ax in axs1.flat:
             ax.label_outer()
         # plt.show()
@@ -592,7 +628,7 @@ def get_effort(jsonData_0, jsonData_1, plot, num_samples, joint_num):
 
     plt.title(listOfJoints[joint_num])
 
-    plt.xlabel("Number of Epochs")
+    plt.xlabel("Number of ROS samples")
     plt.ylabel("Torque (Nm)")
 
     plt.legend(["Initial State", "Optimized State"], loc="lower right")
@@ -636,7 +672,7 @@ def get_multiple_angular_acceleration(jsonData_0, jsonData_1, plot, num_samples,
 
     plt.title(listOfJoints[joint_num])
 
-    plt.xlabel("Number of Epochs")
+    plt.xlabel("Number of ROS samples")
     plt.ylabel("Angular Acceleration (º/s²)")
 
     plt.legend(["Initial State", "Optimized State"], loc="lower right")
@@ -676,15 +712,45 @@ def histogram(ini_acc, end_acc, joint_num, num_samples):
     plt.show()
 
 
+def plot_position(json_data_0, json_data_1, num_samples, joint_num):
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
+    position_array_0 = np.empty(shape=(len(listOfJoints), num_samples - 1))
+    position_array_0.fill(0)
+
+    position_array_1 = np.empty(shape=(len(listOfJoints), num_samples - 1))
+    position_array_1.fill(0)
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, num_samples):
+            position_array_0[i][j - 1] = json_data_0["frames"][j][listOfJoints[i]]["position"]
+
+    for i in range(len(listOfJoints)):
+        for j in range(1, num_samples):
+            position_array_1[i][j - 1] = json_data_1["frames"][j][listOfJoints[i]]["position"]
+
+    plt.plot(position_array_0[joint_num])
+    plt.plot(position_array_1[joint_num])
+
+    plt.title(listOfJoints[joint_num])
+
+    plt.xlabel("Number of ROS samples")
+    plt.ylabel("Position (Radius)")
+
+    plt.legend(["Initial State", "Optimized State"], loc="lower right")
+    plt.show()
+
+
 if __name__ == '__main__':
     # Define and parse input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
     parser.add_argument('--job_name', help='Save data from ROS topics.',
-                        required=False, default="Task_1_fase_0")
+                        required=False, default="Task_2_sim_fase_0")
     parser.add_argument('--job_name_2', help='Save data from ROS topics.',
-                        required=False, default="Task_1_fase_2")
+                        required=False, default="Task_2_sim_fase_2")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--get_exec_time', help='Get the execution time of robot task.',
@@ -696,9 +762,13 @@ if __name__ == '__main__':
     parser.add_argument('--plot_all_acc', help='Plot the angular acceleration for 3 samples.',
                         required=False, default=False)
     parser.add_argument('--plot_joint_num', help='Name of the joint to plot the angular acceleration for 3 samples.',
-                        required=False, default="0")
+                        required=False, default="1")
     parser.add_argument('--plot_effort', help='Plot the effort.',
                         required=False, default=False)
+    parser.add_argument('--plot_position', help='Plot the position of each individual joint',
+                        required=False, default=False)
+    parser.add_argument('--num_samples', help='Number of samples to plot.',
+                        required=False, default="50")
 
     args = parser.parse_args()
 
@@ -749,3 +819,9 @@ if __name__ == '__main__':
         jsonData_1 = read_multiple_json_data(json_file_2)
         get_effort(jsonData_0, jsonData_1, args.plot_effort, 50,
                    int(args.plot_joint_num))
+
+    ## TODO
+    if args.plot_position:
+        jsonData_0 = read_multiple_json_data(json_file)
+        jsonData_1 = read_multiple_json_data(json_file_2)
+        plot_position(jsonData_0, jsonData_1, int(args.num_samples), int(args.plot_joint_num))
