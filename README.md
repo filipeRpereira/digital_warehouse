@@ -101,8 +101,11 @@ The first task is to place a cube on top of another cube.
 
 ![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
 
+
 ### Task 2
 The second task is to place a cube on top of another cube, but this time, there is a barrier between the two cubes.
 
+![task_1_fase_0.gif](Images%2Ftask_1_fase_0.gif)
 
+![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
 
