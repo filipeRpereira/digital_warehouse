@@ -18,12 +18,7 @@ Vivamus velit magna, dapibus in accumsan in, blandit eu eros. Aliquam maximus ve
 hendrerit eget. Nulla ullamcorper vestibulum nisi a eleifend. Maecenas fringilla congue nulla feugiat lobortis.
 
 ### Installation
-Vivamus aliquam eros in iaculis hendrerit. Pellentesque maximus urna eget nibh congue, sit amet commodo massa ultrices. 
-Etiam lacinia id diam non suscipit. Sed mi enim, convallis posuere ultricies sit amet, convallis nec orci. Suspendisse 
-rhoncus orci in pharetra rutrum. Maecenas ac eleifend quam, consectetur efficitur quam. Duis orci justo, aliquet a 
-iaculis sit amet, aliquet id mi. Pellentesque vehicula sapien mauris. Aliquam lacus tellus, porttitor non lorem sed, 
-semper dignissim neque.
-
+Here you can find the packages and software that will be necessary to run this project.
 #### Miniconda
 [website](https://docs.conda.io/en/latest/miniconda_hashes.html)
 
@@ -40,11 +35,10 @@ Once Isaac Gym is installed and samples work within your current python environm
 pip install -e .
 ```
 
-
 #### Isaac Sim
 [website](https://developer.nvidia.com/isaac-sim/download)
 
-#### tensorboard
+#### Tensorboard
 `$ pip install tensorboard`
 
 #### ROS
@@ -100,22 +94,15 @@ initial results.
 * `--plot_position` - Plot the position of each individual joint. Type: `bool`
 * `--num_samples` - Number of ROS samples to analyse. Default `50`. Type: `string` 
 
+## Tasks Results
+### Task 1
+The first task is to place a cube on top of another cube.
+![task_1_fase_0.gif](Images%2Ftask_1_fase_0.gif)
 
-### Loading trained models // Checkpoints
-Fusce egestas mauris et justo ornare hendrerit. Etiam pellentesque nec enim vitae semper. Praesent consequat magna quis 
-pulvinar venenatis. Sed gravida nisi nulla, nec mattis tellus consequat vitae. In eu varius orci, sit amet hendrerit 
-neque. Phasellus lorem leo, malesuada eget pellentesque ac, elementum ut dolor. Ut viverra quis elit a lobortis. 
-Vestibulum consectetur, tellus sit amet molestie cursus, magna velit laoreet erat, sed rhoncus nisl nulla nec dolor. 
-Maecenas efficitur lectus at neque fermentum, aliquam iaculis tellus euismod. Aliquam bibendum eget magna at lobortis. 
-Nullam sed turpis ut leo gravida fermentum. Sed blandit, nulla a pulvinar hendrerit, eros elit suscipit justo, eu 
-venenatis massa orci sed turpis. Curabitur euismod consectetur metus nec ornare.
+![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
 
-### Configuration and command line arguments
+### Task 2
+The second task is to place a cube on top of another cube, but this time, there is a barrier between the two cubes.
 
-* `task=TASK` - selects which task to use. Any of `AllegroHand`, `Ant`, `Anymal`, `AnymalTerrain`, `BallBalance`, 
-* `Cartpole`, `FrankaCabinet`, `Humanoid`, `Ingenuity` `Quadcopter`, `ShadowHand`, `ShadowHandOpenAI_FF`, 
-* `ShadowHandOpenAI_LSTM`, and `Trifinger` (these correspond to the config for each environment in the folder 
-* `isaacgymenvs/config/task`)
 
-## Tasks
 
