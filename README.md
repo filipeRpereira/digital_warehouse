@@ -1,5 +1,6 @@
 # digital_warehouse
-A Path Optimization Algorithm for Industrial Robots Using Deep Reinforcement Learning
+A Path Optimization Algorithm for Industrial Robots Using Deep Reinforcement Learning\
+![Warehouse Image](![Warehouse_image.png](Images/Warehouse_image.png))
 
 ### About this repository
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a finibus orci, pulvinar luctus arcu. Praesent pharetra 
