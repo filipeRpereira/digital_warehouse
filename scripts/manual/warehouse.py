@@ -3,16 +3,24 @@ from omni.isaac.franka import Franka
 from omni.isaac.core.objects import DynamicCuboid, FixedCuboid
 from omni.isaac.franka.controllers import PickPlaceController
 from omni.isaac.core.tasks import BaseTask
+
+import omni.graph.core as og
+from omni.isaac.core_nodes.scripts.utils import set_target_prims
+
 import numpy as np
 
+FRANKA_STAGE_PATH = "/Franka"
+
+
 class FrankaPlaying(BaseTask):
-    #NOTE: we only cover here a subset of the task functions that are available,
+    # NOTE: we only cover here a subset of the task functions that are available,
     # checkout the base class for all the available functions to override.
     # ex: calculate_metrics, is_done..etc.
     def __init__(self, name):
         super().__init__(name=name, offset=None)
         self._goal_position = np.array([0.1, -0.3, 0.18])
         self._task_achieved = False
+        self.create_ros_action_graph(FRANKA_STAGE_PATH)
         return
 
     # Here we setup all the assets that we care about in this task.
@@ -20,34 +28,30 @@ class FrankaPlaying(BaseTask):
         super().set_up_scene(scene)
         scene.add_default_ground_plane()
 
-        
         self._table = scene.add(FixedCuboid(prim_path="/World/table",
                                             name="table",
                                             position=np.array([-0.075, 0.0, 0.05]),
                                             scale=np.array([1.1, 1.0, 0.1]),
                                             color=np.array([0.5, 0.1, 0.1])))
-        
+
         self._franka_base = scene.add(FixedCuboid(prim_path="/World/_franka_base",
-                                            name="_franka_base",
-                                            position=np.array([-0.48, 0.0, 0.15]),
-                                            scale=np.array([0.23, 0.2, 0.125]),
-                                            color=np.array([0.2, 0.4, 0.8])))
-        
+                                                  name="_franka_base",
+                                                  position=np.array([-0.48, 0.0, 0.15]),
+                                                  scale=np.array([0.23, 0.2, 0.125]),
+                                                  color=np.array([0.2, 0.4, 0.8])))
+
         self._cubeA = scene.add(DynamicCuboid(prim_path="/World/cubeA",
-                                            name="cubeA",
-                                            position=np.array([0.05, 0.3, 0.13]),
-                                            scale=np.array([0.05, 0.05, 0.05]),
-                                            color=np.array([0, 0, 1.0])))
+                                              name="cubeA",
+                                              position=np.array([0.05, 0.3, 0.13]),
+                                              scale=np.array([0.05, 0.05, 0.05]),
+                                              color=np.array([0, 0, 1.0])))
 
-        
         self._cubeB = scene.add(DynamicCuboid(prim_path="/World/cubeB",
-                                            name="cubeB",
-                                            position=np.array([0.1, -0.3, 0.13]),
-                                            scale=np.array([0.05, 0.05, 0.05]),
-                                            color=np.array([0, 0.4, 0.1])))
-        
+                                              name="cubeB",
+                                              position=np.array([0.1, -0.3, 0.13]),
+                                              scale=np.array([0.05, 0.05, 0.05]),
+                                              color=np.array([0, 0.4, 0.1])))
 
-        
         scene.add_default_ground_plane()
         self._franka = scene.add(Franka(prim_path="/World/Fancy_Franka",
                                         name="fancy_franka",
@@ -90,6 +94,34 @@ class FrankaPlaying(BaseTask):
         self._cubeA.get_applied_visual_material().set_color(color=np.array([0, 0, 1.0]))
         self._task_achieved = False
         return
+
+    def create_ros_action_graph(self, franka_stage_path):
+        try:
+            og.Controller.edit(
+                {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+                {
+                    og.Controller.Keys.CREATE_NODES: [
+                        ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+                        ("ReadSimTime", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
+                        ("PublishJointState", "omni.isaac.ros_bridge.ROS1PublishJointState"),
+                        # ("SubscribeJointState", "omni.isaac.ros_bridge.ROS1SubscribeJointState"),
+                        # ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
+                        # ("PublishTF", "omni.isaac.ros_bridge.ROS1PublishTransformTree"),
+                        # ("PublishClock", "omni.isaac.ros_bridge.ROS1PublishClock"),
+                    ],
+                    og.Controller.Keys.CONNECT: [
+                        ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
+                        ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+                    ],
+                    og.Controller.Keys.SET_VALUES: [
+                        ("PublishJointState.inputs:topicName", "joint_states_issac"),
+                    ],
+                },
+            )
+            # Setting the /panda target prim to Publish JointState node
+            set_target_prims(primPath="/ActionGraph/PublishJointState", targetPrimPaths=["/World/Fancy_Franka"])
+        except Exception as e:
+            print(e)
 
 
 class Warehouse(BaseSample):
@@ -134,3 +166,5 @@ class Warehouse(BaseSample):
         if self._controller.is_done():
             self._world.pause()
         return
+
+
