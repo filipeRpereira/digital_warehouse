@@ -30,8 +30,10 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
     for i in range(len(home_position)):
         home_position[i] = home_position[i].replace('(', '').replace(')', '')
 
-    home_values = [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04]
-    #home_values = [0.0, -0.7853, 0.0001, -1.5715, 0.0, 1.0423, 0.0, 0.0347, 0.0353]
+    #home_values = [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04]
+    home_values = [0.1037, -0.5213, 0.0936, -2.8438, 0.0471, 2.6852, 0.8157, 0.04, 0.04]
+    end_values = [-0.4705, 0.5908, -0.03, -1.9175, 0.0284, 2.503, 0.2677, 0.04, 0.04]
+
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     dif = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -66,8 +68,8 @@ def listener_ros_topics():
     with open(json_file, "w") as outfile:
         outfile.write(json_object)
 
-    rospy.init_node('listener_new', anonymous=False)
-    jointStates_sub = message_filters.Subscriber('joint_states_issac', JointState)
+    rospy.init_node('listener_new_', anonymous=False)
+    jointStates_sub = message_filters.Subscriber('joint_states_isaac', JointState)
     imuLink0_sub = message_filters.Subscriber('imu_link0', Imu)
     imuLink1_sub = message_filters.Subscriber('imu_link1', Imu)
     imuLink2_sub = message_filters.Subscriber('imu_link2', Imu)
@@ -574,14 +576,6 @@ def get_effort_sum(jsonData):
     return effort
 
 
-## OK - IMPORTANT!!!
-def get_execution_time(jsonData):
-    total_frames = len(jsonData["frames"])
-    sampling_time = 42 / total_frames
-    execution_time = sampling_time * total_frames
-    return execution_time, sampling_time
-
-
 ## OK
 def get_angular_acceleration(jsonData, plot, num_samples):
     total_frames = len(jsonData["frames"])
@@ -748,12 +742,10 @@ if __name__ == '__main__':
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
     parser.add_argument('--job_name', help='Save data from ROS topics.',
-                        required=False, default="Task_2_sim_fase_0")
+                        required=False, default="task_1_0")
     parser.add_argument('--job_name_2', help='Save data from ROS topics.',
-                        required=False, default="Task_2_sim_fase_2")
+                        required=False, default="task_1_3")
     parser.add_argument('--read_data', help='Read data from json file.',
-                        required=False, default=False)
-    parser.add_argument('--get_exec_time', help='Get the execution time of robot task.',
                         required=False, default=False)
     parser.add_argument('--get_angular_acc', help='Get the sum of angular acceleration of each joint.',
                         required=False, default=False)
@@ -782,22 +774,16 @@ if __name__ == '__main__':
     if args.read_data:
         jsonData = read_json_data()
 
-    if args.get_exec_time:
-        jsonData = read_json_data()
-        execution_time, sampling_time = get_execution_time(jsonData)
-        print("Execution Time: ", execution_time)
-        print("Sampling Time: ", sampling_time)
-
     if args.get_angular_acc:
         jsonData_0 = read_multiple_json_data(json_file)
         jsonData_1 = read_multiple_json_data(json_file_2)
-        ang_acceleration_0 = get_angular_acceleration(jsonData_0, False, 50)
-        ang_acceleration_1 = get_angular_acceleration(jsonData_1, False, 50)
+        ang_acceleration_0 = get_angular_acceleration(jsonData_0, False, int(args.num_samples))
+        ang_acceleration_1 = get_angular_acceleration(jsonData_1, False, int(args.num_samples))
 
-        angular_acceleration_sum_0 = get_angular_acceleration_sum(ang_acceleration_0, 50)
-        angular_acceleration_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, 50)
+        angular_acceleration_sum_0 = get_angular_acceleration_sum(ang_acceleration_0, int(args.num_samples))
+        angular_acceleration_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, int(args.num_samples))
 
-        histogram(ang_acceleration_0, ang_acceleration_1, int(args.plot_joint_num), 50)
+        histogram(ang_acceleration_0, ang_acceleration_1, int(args.plot_joint_num), int(args.num_samples))
 
         print("Angular acceleration ini: ")
         print(angular_acceleration_sum_0)
@@ -806,18 +792,18 @@ if __name__ == '__main__':
 
     if args.plot_acc:
         jsonData = read_json_data()
-        get_angular_acceleration(jsonData, args.plot_acc, 50)
+        get_angular_acceleration(jsonData, args.plot_acc, int(args.num_samples))
 
     if args.plot_all_acc:
         jsonData_0 = read_multiple_json_data(json_file)
         jsonData_1 = read_multiple_json_data(json_file_2)
-        get_multiple_angular_acceleration(jsonData_0, jsonData_1, args.plot_all_acc, 50,
+        get_multiple_angular_acceleration(jsonData_0, jsonData_1, args.plot_all_acc, int(args.num_samples),
                                           int(args.plot_joint_num))
 
     if args.plot_effort:
         jsonData_0 = read_multiple_json_data(json_file)
         jsonData_1 = read_multiple_json_data(json_file_2)
-        get_effort(jsonData_0, jsonData_1, args.plot_effort, 50,
+        get_effort(jsonData_0, jsonData_1, args.plot_effort, int(args.num_samples),
                    int(args.plot_joint_num))
 
     ## TODO

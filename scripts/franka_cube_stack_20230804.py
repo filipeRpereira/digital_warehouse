@@ -198,7 +198,8 @@ class FrankaCubeStack(VecTask):
 
         # Franka defaults
         self.franka_default_dof_pos = to_torch(
-            [0.1037, -0.5213, 0.0936, -2.8438, 0.0471, 2.6852, 0.8157, 0.04, 0.04], device=self.device)
+            #[0, 0.1963, 0, -2.6180, 0, 2.9416, 0.7854, 0.035, 0.035], device=self.device)
+            [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04], device=self.device)
 
         # OSC Gains
         self.kp = to_torch([150.] * 6, device=self.device)
