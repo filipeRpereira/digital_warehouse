@@ -19,18 +19,35 @@ class WarehouseExtension(BaseSampleExtension):
     def on_startup(self, ext_id: str):
         super().on_startup(ext_id)
         super().start_extension(
-            menu_name="",
-            submenu_name="",
-            name="Warehouse",
+            menu_name="WareHouse",
+            submenu_name="Tasks",
+            name="Task 1",
             title="Warehouse project",
             doc_link="",
-            overview="",
+            overview="An warehouse project.",
             file_path=os.path.abspath(__file__),
             sample=Warehouse(),
         )
-        # self.task_ui_elements = {}
-        # frame = self.get_frame(index=0)
-        # self.build_task_controls_ui(frame)
+        self.task_ui_elements = {}
+        frame = self.get_frame(index=0)
+        self.build_task_controls_ui(frame)
+        return
+
+    def _on_stacking_button_event(self):
+        asyncio.ensure_future(self.sample._on_stacking_event_async())
+        self.task_ui_elements["Task 1"].enabled = False
+        return
+
+    def post_reset_button_event(self):
+        self.task_ui_elements["Task 1"].enabled = True
+        return
+
+    def post_load_button_event(self):
+        self.task_ui_elements["Task 1"].enabled = True
+        return
+
+    def post_clear_button_event(self):
+        self.task_ui_elements["Task 1"].enabled = False
         return
 
     def build_task_controls_ui(self, frame):
@@ -42,10 +59,11 @@ class WarehouseExtension(BaseSampleExtension):
                 dict = {
                     "label": "Start Stacking",
                     "type": "button",
-                    "text": "Start Stacking",
-                    "tooltip": "Start Stacking",
+                    "text": "Task 1",
+                    "tooltip": "Task 1",
                     "on_clicked_fn": self._on_stacking_button_event,
                 }
 
-                self.task_ui_elements["Start Stacking"] = btn_builder(**dict)
-                self.task_ui_elements["Start Stacking"].enabled = False
+                self.task_ui_elements["Task 1"] = btn_builder(**dict)
+                self.task_ui_elements["Task 1"].enabled = False
+

@@ -9,6 +9,23 @@ from omni.isaac.core_nodes.scripts.utils import set_target_prims
 
 import numpy as np
 
+from omni.isaac.sensor import _sensor
+import asyncio
+import weakref
+import carb
+import omni
+import asyncio
+import weakref
+import omni.physx as _physx
+import omni.ui as ui
+from omni.isaac.sensor import _sensor
+import omni.kit.commands
+from pxr import Gf, UsdGeom
+
+from omni.isaac.ui.ui_utils import setup_ui_headers, get_style, LABEL_WIDTH
+from omni.kit.menu.utils import add_menu_items, remove_menu_items, MenuItemDescription
+from omni.isaac.core.utils.nucleus import get_assets_root_path
+
 FRANKA_STAGE_PATH = "/Franka"
 
 
@@ -56,7 +73,109 @@ class FrankaPlaying(BaseTask):
         self._franka = scene.add(Franka(prim_path="/World/Fancy_Franka",
                                         name="fancy_franka",
                                         position=np.array([-0.45, 0.0, 0.215])))
+
+        self.create_sensor()
         return
+
+    def create_sensor(self):
+        # self._assets_root_path = get_assets_root_path()
+        # if self._assets_root_path is None:
+        #    carb.log_error("Could not find Isaac Sim assets folder")
+        #    return
+
+        # Add IMU Sensor
+        # omni.usd.get_context().open_stage_async(self._assets_root_path + "/Isaac/Robots/Simple/franka.usd")
+        # omni.kit.app.get_app().next_update_async()
+
+        self.meters_per_unit = UsdGeom.GetStageMetersPerUnit(omni.usd.get_context().get_stage())
+
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_0",
+            parent="World/Fancy_Franka/panda_link0",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_1",
+            parent="World/Fancy_Franka/panda_link1",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_2",
+            parent="World/Fancy_Franka/panda_link2",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_3",
+            parent="World/Fancy_Franka/panda_link3",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_4",
+            parent="World/Fancy_Franka/panda_link4",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_5",
+            parent="World/Fancy_Franka/panda_link5",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_6",
+            parent="World/Fancy_Franka/panda_link6",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_7",
+            parent="World/Fancy_Franka/panda_link7",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+        result, sensor = omni.kit.commands.execute(
+            "IsaacSensorCreateImuSensor",
+            path="/imu_sensor_8",
+            parent="World/Fancy_Franka/panda_link8",
+            sensor_period=1 / 500.0,
+            translation=Gf.Vec3d(0, 0, 0),
+            orientation=Gf.Quatd(1, 0, 0, 0),
+            visualize=True,
+        )
+
+        self._events = omni.usd.get_context().get_stage_event_stream()
+        # self._stage_event_subscription = self._events.create_subscription_to_pop(
+        #    self._on_stage_event, name="IMU Sensor Sample stage Watch"
+        # )
 
     # Information exposed to solve the task is returned from the task through get_observations
     def get_observations(self):
@@ -98,28 +217,144 @@ class FrankaPlaying(BaseTask):
     def create_ros_action_graph(self, franka_stage_path):
         try:
             og.Controller.edit(
-                {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
+                {"graph_path": "/World/ActionGraph", "evaluator_name": "execution"},
                 {
                     og.Controller.Keys.CREATE_NODES: [
                         ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
                         ("ReadSimTime", "omni.isaac.core_nodes.IsaacReadSimulationTime"),
                         ("PublishJointState", "omni.isaac.ros_bridge.ROS1PublishJointState"),
-                        # ("SubscribeJointState", "omni.isaac.ros_bridge.ROS1SubscribeJointState"),
-                        # ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
-                        # ("PublishTF", "omni.isaac.ros_bridge.ROS1PublishTransformTree"),
-                        # ("PublishClock", "omni.isaac.ros_bridge.ROS1PublishClock"),
+
+                        ("isaac_read_imu_node_01", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_02", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_03", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_04", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_05", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_06", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_07", "omni.isaac.sensor.IsaacReadIMU"),
+                        ("isaac_read_imu_node_08", "omni.isaac.sensor.IsaacReadIMU"),
+
+                        ("ros1_publish_imu_01", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_02", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_03", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_04", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_05", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_06", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_07", "omni.isaac.ros_bridge.ROS1PublishImu"),
+                        ("ros1_publish_imu_08", "omni.isaac.ros_bridge.ROS1PublishImu"),
+
+                        ("SubscribeJointState", "omni.isaac.ros_bridge.ROS1SubscribeJointState"),
+                        ("ArticulationController", "omni.isaac.core_nodes.IsaacArticulationController"),
                     ],
                     og.Controller.Keys.CONNECT: [
                         ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
                         ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+
+                        ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
+                        ("SubscribeJointState.outputs:execOut", "ArticulationController.inputs:execIn"),
+                        ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+                        (
+                        "SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_01.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_02.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_03.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_04.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_05.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_06.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_07.inputs:execIn"),
+                        ("OnPlaybackTick.outputs:tick", "isaac_read_imu_node_08.inputs:execIn"),
+
+                        ("isaac_read_imu_node_01.outputs:angVel", "ros1_publish_imu_01.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_01.outputs:linAcc", "ros1_publish_imu_01.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_01.outputs:orientation", "ros1_publish_imu_01.inputs:orientation"),
+                        ("isaac_read_imu_node_01.outputs:execOut", "ros1_publish_imu_01.inputs:execIn"),
+
+                        ("isaac_read_imu_node_02.outputs:angVel", "ros1_publish_imu_02.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_02.outputs:linAcc", "ros1_publish_imu_02.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_02.outputs:orientation", "ros1_publish_imu_02.inputs:orientation"),
+                        ("isaac_read_imu_node_02.outputs:execOut", "ros1_publish_imu_02.inputs:execIn"),
+
+                        ("isaac_read_imu_node_03.outputs:angVel", "ros1_publish_imu_03.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_03.outputs:linAcc", "ros1_publish_imu_03.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_03.outputs:orientation", "ros1_publish_imu_03.inputs:orientation"),
+                        ("isaac_read_imu_node_03.outputs:execOut", "ros1_publish_imu_03.inputs:execIn"),
+
+                        ("isaac_read_imu_node_04.outputs:angVel", "ros1_publish_imu_04.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_04.outputs:linAcc", "ros1_publish_imu_04.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_04.outputs:orientation", "ros1_publish_imu_04.inputs:orientation"),
+                        ("isaac_read_imu_node_04.outputs:execOut", "ros1_publish_imu_04.inputs:execIn"),
+
+                        ("isaac_read_imu_node_05.outputs:angVel", "ros1_publish_imu_05.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_05.outputs:linAcc", "ros1_publish_imu_05.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_05.outputs:orientation", "ros1_publish_imu_05.inputs:orientation"),
+                        ("isaac_read_imu_node_05.outputs:execOut", "ros1_publish_imu_05.inputs:execIn"),
+
+                        ("isaac_read_imu_node_06.outputs:angVel", "ros1_publish_imu_06.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_06.outputs:linAcc", "ros1_publish_imu_06.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_06.outputs:orientation", "ros1_publish_imu_06.inputs:orientation"),
+                        ("isaac_read_imu_node_06.outputs:execOut", "ros1_publish_imu_06.inputs:execIn"),
+
+                        ("isaac_read_imu_node_07.outputs:angVel", "ros1_publish_imu_07.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_07.outputs:linAcc", "ros1_publish_imu_07.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_07.outputs:orientation", "ros1_publish_imu_07.inputs:orientation"),
+                        ("isaac_read_imu_node_07.outputs:execOut", "ros1_publish_imu_07.inputs:execIn"),
+
+                        ("isaac_read_imu_node_08.outputs:angVel", "ros1_publish_imu_08.inputs:angularVelocity"),
+                        ("isaac_read_imu_node_08.outputs:linAcc", "ros1_publish_imu_08.inputs:linearAcceleration"),
+                        ("isaac_read_imu_node_08.outputs:orientation", "ros1_publish_imu_08.inputs:orientation"),
+                        ("isaac_read_imu_node_08.outputs:execOut", "ros1_publish_imu_08.inputs:execIn"),
                     ],
                     og.Controller.Keys.SET_VALUES: [
-                        ("PublishJointState.inputs:topicName", "joint_states_issac"),
+                        ("ros1_publish_imu_01.inputs:topicName", "imu_link1"),
+                        ("ros1_publish_imu_02.inputs:topicName", "imu_link2"),
+                        ("ros1_publish_imu_03.inputs:topicName", "imu_link3"),
+                        ("ros1_publish_imu_04.inputs:topicName", "imu_link4"),
+                        ("ros1_publish_imu_05.inputs:topicName", "imu_link5"),
+                        ("ros1_publish_imu_06.inputs:topicName", "imu_link6"),
+                        ("ros1_publish_imu_07.inputs:topicName", "imu_link7"),
+                        ("ros1_publish_imu_08.inputs:topicName", "imu_link8"),
+
+                        ("SubscribeJointState.inputs:topicName", "joint_states"),
+                        ("PublishJointState.inputs:topicName", "joint_states_isaac"),
                     ],
                 },
             )
             # Setting the /panda target prim to Publish JointState node
-            set_target_prims(primPath="/ActionGraph/PublishJointState", targetPrimPaths=["/World/Fancy_Franka"])
+            set_target_prims(primPath="/World/ActionGraph/PublishJointState",
+                             targetPrimPaths=["/World/Fancy_Franka"])
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_01",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link1/imu_sensor_1"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_02",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link2/imu_sensor_2"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_03",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link3/imu_sensor_3"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_04",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link4/imu_sensor_4"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_05",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link5/imu_sensor_5"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_06",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link6/imu_sensor_6"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_07",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link7/imu_sensor_7"],
+                             inputName="inputs:imuPrim")
+
+            set_target_prims(primPath="/World/ActionGraph/isaac_read_imu_node_08",
+                             targetPrimPaths=["/World/Fancy_Franka/panda_link8/imu_sensor_8"],
+                             inputName="inputs:imuPrim")
+
         except Exception as e:
             print(e)
 
@@ -132,7 +367,7 @@ class Warehouse(BaseSample):
     def setup_scene(self):
         world = self.get_world()
         # We add the task to the world here
-        world.add_task(FrankaPlaying(name="my_first_task"))
+        world.add_task(FrankaPlaying(name="task_1"))
         return
 
     async def setup_post_load(self):
@@ -146,12 +381,20 @@ class Warehouse(BaseSample):
             robot_articulation=self._franka,
         )
         self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
-        await self._world.play_async()
+        # await self._world.play_async()
         return
 
-    async def setup_post_reset(self):
+    async def _on_stacking_event_async(self):
+        world = self.get_world()
+        # self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
+        await world.play_async()
+        return
+
+    async def setup_pre_reset(self):
+        world = self.get_world()
+        # if world.physics_callback_exists("sim_step"):
+        #    world.remove_physics_callback("sim_step")
         self._controller.reset()
-        await self._world.play_async()
         return
 
     def physics_step(self, step_size):
