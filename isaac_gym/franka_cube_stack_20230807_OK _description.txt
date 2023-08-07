@@ -1,6 +1,0 @@
-Teste apenas com treino base.
-A posição dos cubos era random.
-Consegui-se uma boa colocaão do cubo A em cima do cubo B.
-
-TODO
-Definir a posição final do braço.
