@@ -827,7 +827,7 @@ if __name__ == '__main__':
         get_effort(jsonData_0, jsonData_1, args.plot_effort, int(args.num_samples),
                    int(args.plot_joint_num))
 
-    ## TODO
+
     if args.plot_position:
         jsonData_0 = read_multiple_json_data(json_file)
         jsonData_1 = read_multiple_json_data(json_file_2)
@@ -856,6 +856,17 @@ def get_valid_frames():
     return valid_seq
 
 
+def get_cycle_time():
+    cycle_time = jsonData["frames"][len(jsonData["frames"])-1]["header"]["stamp"]
+
+    if len(cycle_time) == 9:
+        _cycle_time = '0.' + cycle_time
+    else:
+        _cycle_time = cycle_time[0] + '.' + cycle_time[1:]
+
+    return _cycle_time
+
+
 def get_effort_array(valid_seq):
     total_frames = len(jsonData["frames"])
     data_array = np.empty(shape=(len(listOfJoints), len(valid_seq)))
@@ -870,6 +881,7 @@ def get_effort_array(valid_seq):
 
     return data_array
 
+
 def total_effort_per_joint(valid_seq):
     total_frames = len(jsonData["frames"])
     effort = np.empty(shape=(len(listOfJoints)))
@@ -883,11 +895,16 @@ def total_effort_per_joint(valid_seq):
     return effort
 
 
+
+#TODO
+# gráfico do effort
+# gráfico da posição
+# gráfico da aceleração
+
 valid_frames = get_valid_frames()
 effort_array = get_effort_array(valid_frames)
-
 val = total_effort_per_joint(valid_frames)
+ct = get_cycle_time();
+print("total effort : ", sum(val))
+print("Cycle time   : ", ct)
 
-print(effort_array[1])
-
-print("total effort 1 : ", sum(val))
