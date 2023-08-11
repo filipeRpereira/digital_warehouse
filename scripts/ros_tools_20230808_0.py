@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import sys
+
 import rospy
 from std_msgs.msg import String
 from sensor_msgs.msg import JointState, Imu
@@ -10,13 +12,17 @@ import json
 import numpy as np
 import time
 import argparse
+import datetime
 
-#job_name = "job_2"
+# job_name = "job_2"
 
 time_test = 20000
 time_started = 0
 
 robot_home_position = False
+
+rospy.init_node('listener_new', anonymous=False)
+jointStates_sub = message_filters.Subscriber('joint_states_isaac', JointState)
 
 
 ## OK
@@ -66,8 +72,6 @@ def listener_ros_topics():
     with open(json_file, "w") as outfile:
         outfile.write(json_object)
 
-    rospy.init_node('listener_new_', anonymous=False)
-    jointStates_sub = message_filters.Subscriber('joint_states', JointState)
     imuLink0_sub = message_filters.Subscriber('imu_link0', Imu)
     imuLink1_sub = message_filters.Subscriber('imu_link1', Imu)
     imuLink2_sub = message_filters.Subscriber('imu_link2', Imu)
@@ -392,6 +396,13 @@ def save_json_data(data, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_lin
     with open(json_file, "w") as file:
         json.dump(dataFromJsonFile, file)
 
+    if str(data.header.seq) == "1000":
+        jointStates_sub.unregister()
+        print("")
+        print("")
+        rospy.signal_shutdown("end")
+        sys.exit(0)
+
 
 ## OK
 def read_json_data():
@@ -552,7 +563,7 @@ def get_angular_velocity_sum(jsonData):
     ang_vel = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
 
     for i in range(len(listOfJoints)):
-        #print(listOfJoints[i])
+        # print(listOfJoints[i])
         ang_vel_ = 0
         for j in range(len(jsonData["frames"])):
             ang_vel_ = ang_vel_ + abs(jsonData["frames"][j][listOfJoints[i]]["velocity"])
@@ -580,17 +591,20 @@ def get_angular_acceleration(jsonData, plot, num_samples):
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
 
-    angular_acceleration_array = np.empty(shape=(len(listOfJoints), total_frames-1))
+    angular_acceleration_array = np.empty(shape=(len(listOfJoints), total_frames - 1))
     angular_acceleration_array.fill(0)
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData["frames"])):
-            pre_stamp = jsonData["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData["frames"][j-1]["header"]["stamp"][10:]
-            act_stamp = jsonData["frames"][j]["header"]["stamp"][0:10] + "." + jsonData["frames"][j]["header"]["stamp"][10:]
+            pre_stamp = jsonData["frames"][j - 1]["header"]["stamp"][0:10] + "." + jsonData["frames"][j - 1]["header"][
+                                                                                       "stamp"][10:]
+            act_stamp = jsonData["frames"][j]["header"]["stamp"][0:10] + "." + jsonData["frames"][j]["header"]["stamp"][
+                                                                               10:]
             delta_time = float(act_stamp) - float(pre_stamp)
-            acc = jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j-1][listOfJoints[i]]["velocity"]
+            acc = jsonData["frames"][j][listOfJoints[i]]["velocity"] - jsonData["frames"][j - 1][listOfJoints[i]][
+                "velocity"]
 
-            angular_acceleration_array[i][j-1] = acc/delta_time
+            angular_acceleration_array[i][j - 1] = acc / delta_time
 
     return angular_acceleration_array
 
@@ -601,19 +615,19 @@ def get_effort(jsonData_0, jsonData_1, plot, num_samples, joint_num):
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
 
-    effort_array_0 = np.empty(shape=(len(listOfJoints), total_frames_0-1))
+    effort_array_0 = np.empty(shape=(len(listOfJoints), total_frames_0 - 1))
     effort_array_0.fill(0)
 
-    effort_array_1 = np.empty(shape=(len(listOfJoints), total_frames_1-1))
+    effort_array_1 = np.empty(shape=(len(listOfJoints), total_frames_1 - 1))
     effort_array_1.fill(0)
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData_0["frames"])):
-            effort_array_0[i][j-1] = jsonData_0["frames"][j][listOfJoints[i]]["effort"]
+            effort_array_0[i][j - 1] = jsonData_0["frames"][j][listOfJoints[i]]["effort"]
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData_1["frames"])):
-            effort_array_1[i][j-1] = jsonData_1["frames"][j][listOfJoints[i]]["effort"]
+            effort_array_1[i][j - 1] = jsonData_1["frames"][j][listOfJoints[i]]["effort"]
 
     plt.plot(effort_array_0[joint_num][0:num_samples])
     plt.plot(effort_array_1[joint_num][0:num_samples])
@@ -632,29 +646,35 @@ def get_multiple_angular_acceleration(jsonData_0, jsonData_1, plot, num_samples,
     total_frames_1 = len(jsonData_1["frames"])
     listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
                     "joint_5", "joint_6", "joint_7", "joint_8"]
-    angular_acceleration_array_0 = np.empty(shape=(len(listOfJoints), total_frames_0-1))
+    angular_acceleration_array_0 = np.empty(shape=(len(listOfJoints), total_frames_0 - 1))
     angular_acceleration_array_0.fill(0)
 
-    angular_acceleration_array_1 = np.empty(shape=(len(listOfJoints), total_frames_1-1))
+    angular_acceleration_array_1 = np.empty(shape=(len(listOfJoints), total_frames_1 - 1))
     angular_acceleration_array_1.fill(0)
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData_0["frames"])):
-            pre_stamp = jsonData_0["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData_0["frames"][j-1]["header"]["stamp"][10:]
-            act_stamp = jsonData_0["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_0["frames"][j]["header"]["stamp"][10:]
+            pre_stamp = jsonData_0["frames"][j - 1]["header"]["stamp"][0:10] + "." + \
+                        jsonData_0["frames"][j - 1]["header"]["stamp"][10:]
+            act_stamp = jsonData_0["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_0["frames"][j]["header"][
+                                                                                     "stamp"][10:]
             delta_time = float(act_stamp) - float(pre_stamp)
-            acc = jsonData_0["frames"][j][listOfJoints[i]]["velocity"] - jsonData_0["frames"][j-1][listOfJoints[i]]["velocity"]
+            acc = jsonData_0["frames"][j][listOfJoints[i]]["velocity"] - jsonData_0["frames"][j - 1][listOfJoints[i]][
+                "velocity"]
 
-            angular_acceleration_array_0[i][j-1] = acc/delta_time
+            angular_acceleration_array_0[i][j - 1] = acc / delta_time
 
     for i in range(len(listOfJoints)):
         for j in range(1, len(jsonData_1["frames"])):
-            pre_stamp = jsonData_1["frames"][j-1]["header"]["stamp"][0:10] + "." + jsonData_1["frames"][j-1]["header"]["stamp"][10:]
-            act_stamp = jsonData_1["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_1["frames"][j]["header"]["stamp"][10:]
+            pre_stamp = jsonData_1["frames"][j - 1]["header"]["stamp"][0:10] + "." + \
+                        jsonData_1["frames"][j - 1]["header"]["stamp"][10:]
+            act_stamp = jsonData_1["frames"][j]["header"]["stamp"][0:10] + "." + jsonData_1["frames"][j]["header"][
+                                                                                     "stamp"][10:]
             delta_time = float(act_stamp) - float(pre_stamp)
-            acc = jsonData_1["frames"][j][listOfJoints[i]]["velocity"] - jsonData_1["frames"][j-1][listOfJoints[i]]["velocity"]
+            acc = jsonData_1["frames"][j][listOfJoints[i]]["velocity"] - jsonData_1["frames"][j - 1][listOfJoints[i]][
+                "velocity"]
 
-            angular_acceleration_array_1[i][j-1] = acc/delta_time
+            angular_acceleration_array_1[i][j - 1] = acc / delta_time
 
     fase_0 = angular_acceleration_array_0[joint_num][0:num_samples]
     fase_1 = angular_acceleration_array_1[joint_num][0:num_samples]
@@ -766,6 +786,9 @@ if __name__ == '__main__':
     json_file = "/home/filipe/Desktop/Dissertação/" + args.job_name + ".json"
     json_file_2 = "/home/filipe/Desktop/Dissertação/" + args.job_name_2 + ".json"
 
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
     if args.save_data:
         listener_ros_topics()
 
@@ -809,3 +832,62 @@ if __name__ == '__main__':
         jsonData_0 = read_multiple_json_data(json_file)
         jsonData_1 = read_multiple_json_data(json_file_2)
         plot_position(jsonData_0, jsonData_1, int(args.num_samples), int(args.plot_joint_num))
+
+
+def get_valid_frames():
+    valid_seq = []
+
+    for i in range(1, len(jsonData["frames"]) - 1):
+        previous_stamp = jsonData["frames"][i - 1]["header"]["stamp"]
+        actual_stamp = jsonData["frames"][i]["header"]["stamp"]
+        if len(previous_stamp) == 9:
+            _previous_stamp = '0.' + previous_stamp
+        else:
+            _previous_stamp = previous_stamp[0] + '.' + previous_stamp[1:]
+
+        if len(actual_stamp) == 9:
+            _actual_stamp = '0.' + actual_stamp
+        else:
+            _actual_stamp = actual_stamp[0] + '.' + actual_stamp[1:]
+
+        if _actual_stamp[2] != _previous_stamp[2]:
+            valid_seq.append(jsonData["frames"][i]["header"]["seq"])
+
+    return valid_seq
+
+
+def get_effort_array(valid_seq):
+    total_frames = len(jsonData["frames"])
+    data_array = np.empty(shape=(len(listOfJoints), len(valid_seq)))
+    data_array.fill(0)
+
+    for i in range(len(listOfJoints)):
+        aux = 0
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
+                data_array[i][aux] = jsonData["frames"][j][listOfJoints[i]]["effort"]
+                aux += 1
+
+    return data_array
+
+def total_effort_per_joint(valid_seq):
+    total_frames = len(jsonData["frames"])
+    effort = np.empty(shape=(len(listOfJoints)))
+    effort.fill(0)
+
+    for i in range(len(listOfJoints)):
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
+                effort[i] += abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+
+    return effort
+
+
+valid_frames = get_valid_frames()
+effort_array = get_effort_array(valid_frames)
+
+val = total_effort_per_joint(valid_frames)
+
+print(effort_array[1])
+
+print("total effort 1 : ", sum(val))

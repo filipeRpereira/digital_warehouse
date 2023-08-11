@@ -7,8 +7,13 @@ import json
 import numpy as np
 import argparse
 
+import sys
+
 time_test = 20000
 time_started = 0
+
+rospy.init_node('listener_new', anonymous=False)
+jointStates_sub = message_filters.Subscriber('joint_states', JointState)
 
 
 def callback_check_home_end_position(joints):
@@ -18,7 +23,7 @@ def callback_check_home_end_position(joints):
     for i in range(len(home_position)):
         home_position[i] = home_position[i].replace('(', '').replace(')', '')
 
-    home_values = [0.012, -0.5697, 0.0, -2.8105, 0.0, 3.0312, 0.741, 0.04, 0.04]
+    home_values = [0.1037, -0.5213, 0.0936, -2.8438, 0.0471, 2.6852, 0.8157, 0.04, 0.04]
     dif_robot = [0, 0, 0, 0, 0, 0, 0, 0, 0]
     dif = [0, 0, 0, 0, 0, 0, 0, 0, 0]
 
@@ -34,11 +39,11 @@ def callback_check_home_end_position(joints):
             home = False
 
     if not home:
-        print("Not Home Position", flush=True, end="\r")
+        #print("Not Home Position", flush=True, end="\r")
         save_json_data(joints)
 
     else:
-        print("Home Position", flush=True, end="\r")
+        print("Saving ROS data...", flush=True, end="\r")
 
 
 def listener_ros_topics():
@@ -48,9 +53,6 @@ def listener_ros_topics():
 
     with open(json_file_1, "w") as outfile:
         outfile.write(json_object)
-
-    rospy.init_node('listener_new', anonymous=False)
-    jointStates_sub = message_filters.Subscriber('joint_states', JointState)
 
     ts = message_filters.TimeSynchronizer([jointStates_sub], 10)
     ts.registerCallback(callback_check_home_end_position)
@@ -363,6 +365,13 @@ def save_json_data(data):
     with open(json_file_1, "w") as file:
         json.dump(dataFromJsonFile, file)
 
+    if str(data.header.seq) == "320":
+        jointStates_sub.unregister()
+        print("")
+        print("")
+        rospy.signal_shutdown("end")
+        sys.exit(0)
+
 
 def read_json_data(json_data):
     # Opening JSON file
@@ -534,9 +543,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_data', help='Save data from ROS topics.',
                         required=False, default=False)
     parser.add_argument('--job_name_1', help='Save data from ROS topics.',
-                        required=False, default="Task_1_gym_fase_0")
+                        required=False, default="task1_1")
     parser.add_argument('--job_name_2', help='Save data from ROS topics.',
-                        required=False, default="Task_1_gym_fase_2")
+                        required=False, default="task1_2")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--get_angular_acc_sum', help='Get the sum of angular acceleration of each joint.',
