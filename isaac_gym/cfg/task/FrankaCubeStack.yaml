@@ -3,18 +3,12 @@ name: FrankaCubeStack
 
 physics_engine: ${..physics_engine}
 
-# if given, will override the device setting in gym. 
+# if given, will override the device setting in gym.
 env:
   numEnvs: ${resolve_default:8192,${...num_envs}}
   envSpacing: 1.5
   episodeLength: 320
   enableDebugVis: False
-
-  enableRos: True
-  justOneTest: True
-  randomCubeABPosition: False
-  enableFindHighestReward: True
-  frankaId: 253
 
   clipObservations: 5.0
   clipActions: 1.0
@@ -25,14 +19,7 @@ env:
   frankaRotationNoise: 0.0
   frankaDofNoise: 0.25
 
-  cubeACoordinates: [0.05, 0.3]
-  cubeBCoordinates: [0.10, -0.3]
-
   aggregateMode: 3
-
-  # *** reward function scales ***
-  enableCycleTimeReward: 1.0
-  enableTorqueReward: 0.0
 
   actionScale: 1.0
   distRewardScale: 0.1
@@ -40,16 +27,17 @@ env:
   alignRewardScale: 2.0
   stackRewardScale: 16.0
 
-  cycleTimeRewardScale: 1.0
-  torqueJoint0RewardScale: 0.30
-  torqueJoint1RewardScale: 0.30
-  torqueJoint2RewardScale: 0.20
-  torqueJoint3RewardScale: 0.10
-  torqueJoint4RewardScale: 0.05
-  torqueJoint5RewardScale: 0.03
-  torqueJoint6RewardScale: 0.02
-
   controlType: osc  # options are {joint_tor, osc}
+
+#     #[-0.43882057  0.41084743 -0.06583226 -1.9140093   0.03765289  2.3219993, 0.26197127  0.04 0.04]
+  frankaId: 30 #8
+  cubeACoordinates: [0.05, 0.3]
+  cubeBCoordinates: [0.10, -0.3]
+  randomCubeABPosition: True
+  optimize: True
+  justOneTest: True
+  enableFindHighestReward: True
+  enableRos: True
 
   asset:
     assetRoot: "../../assets"

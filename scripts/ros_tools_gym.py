@@ -8,6 +8,7 @@ import numpy as np
 import argparse
 
 import sys
+from datetime import datetime
 
 time_test = 20000
 time_started = 0
@@ -565,8 +566,11 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    json_file_1 = "/home/filipe/Desktop/Dissertação/Isaac_Gym/" + args.job_name_1 + ".json"
-    json_file_2 = "/home/filipe/Desktop/Dissertação/Isaac_Gym/" + args.job_name_2 + ".json"
+    json_file_1 = "/home/filipe/Desktop/Dissertação/" + args.job_name_1 + ".json"
+    json_file_2 = "/home/filipe/Desktop/Dissertação/" + args.job_name_2 + ".json"
+
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
 
     if args.save_data:
         listener_ros_topics()
@@ -612,3 +616,74 @@ if __name__ == '__main__':
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
         plot_position(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
+
+
+def get_valid_frames():
+    valid_seq = []
+
+    for i in range(1, len(jsonData["frames"]) - 1):
+        previous_stamp = datetime.fromtimestamp(int(jsonData["frames"][i-1]["header"]["stamp"])/1e9)
+        previous_stamp = previous_stamp.strftime('%H:%M:%S.%f')
+
+        actual_stamp = datetime.fromtimestamp(int(jsonData["frames"][i]["header"]["stamp"])/1e9)
+        actual_stamp = actual_stamp.strftime('%H:%M:%S.%f')
+
+        if actual_stamp[9] != previous_stamp[9]:
+            valid_seq.append(jsonData["frames"][i]["header"]["seq"])
+            #print(actual_stamp)
+
+    return valid_seq
+
+
+def get_cycle_time():
+    init_stamp = datetime.fromtimestamp(int(jsonData["frames"][0]["header"]["stamp"]) / 1e9)
+    end_stamp = datetime.fromtimestamp(int(jsonData["frames"][len(jsonData["frames"])-1]["header"]["stamp"]) / 1e9)
+
+    start_time = str(init_stamp.time())
+    end_time = str(end_stamp.time())
+
+    # convert time string to datetime
+    t1 = datetime.strptime(start_time, "%H:%M:%S.%f")
+    print('Start time:', t1.time())
+    t2 = datetime.strptime(end_time, "%H:%M:%S.%f")
+    print('End time:', t2.time())
+    delta = t2 - t1
+
+    return delta.total_seconds()
+
+
+def get_effort_array(valid_seq):
+    total_frames = len(jsonData["frames"])
+    data_array = np.empty(shape=(len(listOfJoints), len(valid_seq)))
+    data_array.fill(0)
+
+    for i in range(len(listOfJoints)):
+        aux = 0
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
+                data_array[i][aux] = jsonData["frames"][j][listOfJoints[i]]["effort"]
+                aux += 1
+
+    return data_array
+
+
+def total_effort_per_joint(valid_seq):
+    total_frames = len(jsonData["frames"])
+    effort = np.empty(shape=(len(listOfJoints)))
+    effort.fill(0)
+
+    for i in range(len(listOfJoints)):
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
+                effort[i] += abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+
+    return effort
+
+
+valid_frames = get_valid_frames()
+effort_array = get_effort_array(valid_frames)
+val = total_effort_per_joint(valid_frames)
+ct = get_cycle_time();
+print("total effort : ", sum(val))
+print("Cycle time   : ", ct)
+
