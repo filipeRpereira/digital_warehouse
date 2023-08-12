@@ -8,11 +8,10 @@ import json
 import numpy as np
 import argparse
 
-
 robot_home_position = False
 
 rospy.init_node('listener_new', anonymous=False)
-jointStates_sub = message_filters.Subscriber('joint_states_isaac', JointState)
+jointStates_sub = message_filters.Subscriber('joint_states_sim', JointState)
 
 
 def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3, imu_link_4, imu_link_5,
@@ -405,9 +404,15 @@ def total_effort_per_joint(valid_seq):
     effort.fill(0)
 
     for i in range(len(listOfJoints)):
+        # For debug only
+        # print("-------------------- Joint " + str(i) + " --------------------")
+
         for j in range(0, total_frames):
             if jsonData["frames"][j]["header"]["seq"] in valid_seq:
                 effort[i] += abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+                # For debug only
+                # print("Seq    : ", str(jsonData["frames"][j]["header"]["seq"]))
+                # print("Effort :      " + str(jsonData["frames"][j][listOfJoints[i]]["effort"]))
 
     return effort
 
@@ -431,11 +436,17 @@ def get_valid_frames():
         if _actual_stamp[2] != _previous_stamp[2]:
             valid_seq.append(jsonData["frames"][i]["header"]["seq"])
 
+            # for debug
+            # print("---------------------------------------------------------")
+            # print("Sequence  : ", jsonData["frames"][i]["header"]["seq"])
+            # print("Timestamp : ", jsonData["frames"][i]["header"]["stamp"])
+            # print("Time      : ", _actual_stamp)
+
     return valid_seq
 
 
 def get_cycle_time():
-    cycle_time = jsonData["frames"][len(jsonData["frames"])-1]["header"]["stamp"]
+    cycle_time = jsonData["frames"][len(jsonData["frames"]) - 1]["header"]["stamp"]
 
     if len(cycle_time) == 9:
         _cycle_time = '0.' + cycle_time
@@ -451,15 +462,40 @@ def get_angular_acc_array(valid_frames):
     data_array.fill(0)
 
     for i in range(len(listOfJoints)):
-        aux = 0
+        # For debug only
+        # print("-------------------- Joint " + str(i) + " --------------------")
 
+        aux = 0
         for j in range(0, total_frames):
             if jsonData["frames"][j]["header"]["seq"] in valid_frames:
-                acc = (jsonData["frames"][j][listOfJoints[i]]["velocity"] -
-                       jsonData["frames"][j - 1][listOfJoints[i]]["velocity"])
+                idx_valid_frames = valid_frames.index(jsonData["frames"][j]["header"]["seq"])
 
-                data_array[i][aux] = acc / 0.2
+                next_idx_value_valid_frames = idx_valid_frames + 1
+
+                if next_idx_value_valid_frames < len(valid_frames):
+                    valid_frames_next_frame = valid_frames[next_idx_value_valid_frames]
+                else:
+                    valid_frames_next_frame = len(valid_frames)
+
+                velocity_now = jsonData["frames"][j][listOfJoints[i]]["velocity"]
+
+                velocity_next = 0
+                for k in range(0, total_frames):
+                    if jsonData["frames"][k]["header"]["seq"] == valid_frames_next_frame:
+                        velocity_next = jsonData["frames"][k][listOfJoints[i]]["velocity"]
+
+                data_array[i][aux] = (velocity_next - velocity_now) / 0.1
                 aux += 1
+
+                # for debug only
+                # print("seq in jsonData             : ", jsonData["frames"][j]["header"]["seq"])
+                # print("idx_valid_frames            : ", idx_valid_frames)
+                # print("next_idx_value_valid_frames : ", next_idx_value_valid_frames)
+                # print("valid_frames_next_frame     : ", valid_frames_next_frame)
+                # print("velocity_now                : ", velocity_now)
+                # print("velocity_next               : ", velocity_next)
+                # print("delta velocity              : ", (velocity_next - velocity_now))
+                # print("")
 
     return data_array
 
@@ -467,7 +503,7 @@ def get_angular_acc_array(valid_frames):
 def plot_angular_acc_sim(_angular_acc_array, _timestamp_array, joint_num):
     plt.title("Manual Programming - " + listOfJoints[joint_num])
     plt.xlabel("Duration (s)")
-    plt.ylabel("Angular Acceleration ()")
+    plt.ylabel("Angular Acceleration (rad/s²)")
 
     plt.plot(_timestamp_array, _angular_acc_array[joint_num])
     plt.xticks(np.linspace(0.0, timestamp_array[-1], num=10))
@@ -498,7 +534,7 @@ def get_valid_timestamp_frame(valid_frames):
     for i in range(0, total_frames):
         if jsonData["frames"][i]["header"]["seq"] in valid_frames:
             timestamp_array.append(jsonData["frames"][i]["header"]["stamp"])
-            #print(jsonData["frames"][i]["header"]["stamp"])
+            # print(jsonData["frames"][i]["header"]["stamp"])
 
     for i in range(len(timestamp_array)):
         if len(timestamp_array[i]) == 9:
@@ -579,10 +615,10 @@ if __name__ == '__main__':
     if args.read_data:
         jsonData = read_json_data()
         valid_frames = get_valid_frames()
-        val = total_effort_per_joint(valid_frames)
-        ct = get_cycle_time()
-        print("total effort : ", sum(val))
-        print("Cycle time   : ", ct)
+        effort_joint = total_effort_per_joint(valid_frames)
+        cycle_time = get_cycle_time()
+        print("total effort : " + str(round(sum(effort_joint))) + " Nm")
+        print("Cycle time   : " + str(round(float(cycle_time), 2)) + " s")
 
     if args.plot_acc:
         jsonData = read_json_data()
