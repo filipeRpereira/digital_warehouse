@@ -43,12 +43,11 @@ def callback_check_home_position(joints, imu_link_0, imu_link_1, imu_link_2, imu
     global robot_home_position
 
     if not home:
-        print("Not Home Position", flush=True, end="\r")
         save_json_data(joints, imu_link_0, imu_link_1, imu_link_2, imu_link_3,
                        imu_link_4, imu_link_5, imu_link_6, imu_link_7, imu_link_8)
 
     else:
-        print("Home Position", flush=True, end="\r")
+        print("Saving ROS data...", flush=True, end="\r")
 
 
 def listener_ros_topics():

@@ -14,7 +14,7 @@ time_test = 20000
 time_started = 0
 
 rospy.init_node('listener_new', anonymous=False)
-jointStates_sub = message_filters.Subscriber('joint_states', JointState)
+jointStates_sub = message_filters.Subscriber('joint_states_gym', JointState)
 
 
 def callback_check_home_end_position(joints):
@@ -40,7 +40,6 @@ def callback_check_home_end_position(joints):
             home = False
 
     if not home:
-        #print("Not Home Position", flush=True, end="\r")
         save_json_data(joints)
 
     else:
@@ -52,7 +51,7 @@ def listener_ros_topics():
         "frames": []
     }, indent=2)
 
-    with open(json_file_1, "w") as outfile:
+    with open(json_file, "w") as outfile:
         outfile.write(json_object)
 
     ts = message_filters.TimeSynchronizer([jointStates_sub], 10)
@@ -356,14 +355,14 @@ def save_json_data(data):
         }
     }
     # 1. Read file contents
-    with open(json_file_1, "r") as file:
+    with open(json_file, "r") as file:
         dataFromJsonFile = json.load(file)
 
     # 2. Update json object
     dataFromJsonFile["frames"].append(entry)
 
     # 3. Write json file
-    with open(json_file_1, "w") as file:
+    with open(json_file, "w") as file:
         json.dump(dataFromJsonFile, file)
 
     if str(data.header.seq) == "320":
@@ -372,165 +371,6 @@ def save_json_data(data):
         print("")
         rospy.signal_shutdown("end")
         sys.exit(0)
-
-
-
-
-
-def get_effort_sum(json_data, num_samples):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7", "joint_8"]
-    effort = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
-
-    for i in range(len(listOfJoints)):
-        effort_ = 0
-        for j in range(num_samples):
-            effort_ = effort_ + abs(json_data["frames"][j][listOfJoints[i]]["effort"])
-        effort[i] = effort_
-    return effort
-
-
-def get_angular_acceleration(json_data, num_samples):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-
-    angular_acceleration_array = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    angular_acceleration_array.fill(0)
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            pre_stamp = json_data["frames"][j - 1]["header"]["stamp"][0:10] + "." + \
-                        json_data["frames"][j - 1]["header"]["stamp"][10:]
-            act_stamp = json_data["frames"][j]["header"]["stamp"][0:10] + "." + json_data["frames"][j]["header"][
-                                                                                    "stamp"][10:]
-            delta_time = float(act_stamp) - float(pre_stamp)
-            acc = json_data["frames"][j][listOfJoints[i]]["velocity"] - json_data["frames"][j - 1][listOfJoints[i]][
-                "velocity"]
-
-            angular_acceleration_array[i][j - 1] = acc / delta_time
-
-    return angular_acceleration_array
-
-
-def plot_effort(json_data_0, json_data_1, num_samples, joint_num):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-
-    effort_array_0 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    effort_array_0.fill(0)
-
-    effort_array_1 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    effort_array_1.fill(0)
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            effort_array_0[i][j - 1] = json_data_0["frames"][j][listOfJoints[i]]["effort"]
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            effort_array_1[i][j - 1] = json_data_1["frames"][j][listOfJoints[i]]["effort"]
-
-    plt.plot(effort_array_0[joint_num])
-    plt.plot(effort_array_1[joint_num])
-
-    plt.title(listOfJoints[joint_num])
-
-    plt.xlabel("Number of Epochs")
-    plt.ylabel("Torque (Nm)")
-
-    plt.legend(["Initial State", "Optimized State"], loc="lower right")
-    plt.show()
-
-
-def plot_position(json_data_0, json_data_1, num_samples, joint_num):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-
-    position_array_0 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    position_array_0.fill(0)
-
-    position_array_1 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    position_array_1.fill(0)
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            position_array_0[i][j - 1] = json_data_0["frames"][j][listOfJoints[i]]["position"]
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            position_array_1[i][j - 1] = json_data_1["frames"][j][listOfJoints[i]]["position"]
-
-    plt.plot(position_array_0[joint_num])
-    plt.plot(position_array_1[joint_num])
-
-    plt.title(listOfJoints[joint_num])
-
-    plt.xlabel("Number of Epochs")
-    plt.ylabel("Position (Radius)")
-
-    plt.legend(["Initial State", "Optimized State"], loc="lower right")
-    plt.show()
-
-    
-def get_multiple_angular_acceleration(json_data_0, json_data_1, num_samples, joint_num):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-    angular_acceleration_array_0 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    angular_acceleration_array_0.fill(0)
-
-    angular_acceleration_array_1 = np.empty(shape=(len(listOfJoints), num_samples - 1))
-    angular_acceleration_array_1.fill(0)
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            pre_stamp = json_data_0["frames"][j - 1]["header"]["stamp"][0:10] + "." + \
-                        json_data_0["frames"][j - 1]["header"]["stamp"][10:]
-            act_stamp = json_data_0["frames"][j]["header"]["stamp"][0:10] + "." + json_data_0["frames"][j]["header"][
-                                                                                      "stamp"][10:]
-            delta_time = float(act_stamp) - float(pre_stamp)
-            acc = json_data_0["frames"][j][listOfJoints[i]]["velocity"] - json_data_0["frames"][j - 1][listOfJoints[i]][
-                "velocity"]
-
-            angular_acceleration_array_0[i][j - 1] = acc / delta_time
-
-    for i in range(len(listOfJoints)):
-        for j in range(1, num_samples):
-            pre_stamp = json_data_1["frames"][j - 1]["header"]["stamp"][0:10] + "." + \
-                        json_data_1["frames"][j - 1]["header"]["stamp"][10:]
-            act_stamp = json_data_1["frames"][j]["header"]["stamp"][0:10] + "." + json_data_1["frames"][j]["header"][
-                                                                                      "stamp"][10:]
-            delta_time = float(act_stamp) - float(pre_stamp)
-            acc = json_data_1["frames"][j][listOfJoints[i]]["velocity"] - json_data_1["frames"][j - 1][listOfJoints[i]][
-                "velocity"]
-
-            angular_acceleration_array_1[i][j - 1] = acc / delta_time
-
-    phase_0 = angular_acceleration_array_0[joint_num]
-    phase_1 = angular_acceleration_array_1[joint_num]
-
-    plt.plot(phase_0)
-    plt.plot(phase_1)
-
-    plt.title(listOfJoints[joint_num])
-
-    plt.xlabel("Number of Epochs")
-    plt.ylabel("Angular Acceleration (º/s²)")
-
-    plt.legend(["Initial State", "Optimized State"], loc="lower right")
-
-    plt.show()
-
-
-def get_angular_acceleration_sum(ang_acceleration, num_samples):
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-    acc = np.array([[0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0], [0.0]])
-
-    for i in range(len(listOfJoints)):
-        aux = 0
-        for j in range(num_samples - 1):
-            aux = aux + abs(ang_acceleration[i][j])
-        acc[i] = aux
-    return acc
 
 
 # +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -669,7 +509,6 @@ def get_valid_timestamp_frame(valid_frames):
     start_time = str(first_timestamp.time())
 
     t1 = datetime.strptime(start_time, "%H:%M:%S.%f")
-    # print('Start time:', t1.time())
 
     for i in range(0, total_frames):
         if jsonData["frames"][i]["header"]["seq"] in valid_frames:
@@ -679,7 +518,6 @@ def get_valid_timestamp_frame(valid_frames):
 
             delta = t2 - t1
             timestamp_array.append(round(delta.total_seconds(), 2))
-            # print("delta : ", round(delta.total_seconds(), 2))
 
     return timestamp_array
 
@@ -696,14 +534,12 @@ def plot_effort_sim(_effort_array, _timestamp_array, joint_num):
     plt.show()
 
 
-
 def plot_angular_acc_sim(_angular_acc_array, _timestamp_array, joint_num):
     plt.title("Reinforcement Learning - " + listOfJoints[joint_num])
     plt.xlabel("Duration (s)")
     plt.ylabel("Angular Acceleration (rad/s²)")
 
     plt.plot(_timestamp_array, _angular_acc_array[joint_num])
-    #plt.xticks(np.linspace(0.0, timestamp_array[-1], num=10))
     plt.xticks(rotation=90)
 
     plt.show()
