@@ -616,7 +616,7 @@ if __name__ == '__main__':
         valid_frames = get_valid_frames()
         effort_joint = total_effort_per_joint(valid_frames)
         cycle_time = get_cycle_time()
-        print("total effort : " + str(round(sum(effort_joint))) + " Nm")
+        print("Total effort : " + str(round(sum(effort_joint))) + " Nm")
         print("Cycle time   : " + str(round(float(cycle_time), 2)) + " s")
 
     if args.plot_acc:

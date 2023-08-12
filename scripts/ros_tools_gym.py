@@ -373,7 +373,6 @@ def save_json_data(data):
         sys.exit(0)
 
 
-# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 def read_json_data():
     # Opening JSON file
     with open(json_file) as file:
@@ -431,9 +430,9 @@ def get_cycle_time():
 
     # convert time string to datetime
     t1 = datetime.strptime(start_time, "%H:%M:%S.%f")
-    print('Start time:', t1.time())
+    #print('Start time:', t1.time())
     t2 = datetime.strptime(end_time, "%H:%M:%S.%f")
-    print('End time:', t2.time())
+    #print('End time:', t2.time())
     delta = t2 - t1
 
     return delta.total_seconds()
@@ -605,7 +604,7 @@ if __name__ == '__main__':
         valid_frames = get_valid_frames()
         effort_joint = total_effort_per_joint(valid_frames)
         cycle_time = get_cycle_time()
-        print("total effort : " + str(round(sum(effort_joint))) + " Nm")
+        print("Total effort : " + str(round(sum(effort_joint))) + " Nm")
         print("Cycle time   : " + str(round(float(cycle_time), 2)) + " s")
 
     if args.plot_acc:
