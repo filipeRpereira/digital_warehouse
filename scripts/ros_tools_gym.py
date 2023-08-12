@@ -374,12 +374,7 @@ def save_json_data(data):
         sys.exit(0)
 
 
-def read_json_data(json_data):
-    # Opening JSON file
-    with open(json_data) as file:
-        json_data = json.load(file)
 
-    return json_data
 
 
 def get_effort_sum(json_data, num_samples):
@@ -538,84 +533,13 @@ def get_angular_acceleration_sum(ang_acceleration, num_samples):
     return acc
 
 
-if __name__ == '__main__':
-    # Define and parse input arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--save_data', help='Save data from ROS topics.',
-                        required=False, default=False)
-    parser.add_argument('--job_name_1', help='Save data from ROS topics.',
-                        required=False, default="task1_1")
-    parser.add_argument('--job_name_2', help='Save data from ROS topics.',
-                        required=False, default="task1_2")
-    parser.add_argument('--read_data', help='Read data from json file.',
-                        required=False, default=False)
-    parser.add_argument('--get_angular_acc_sum', help='Get the sum of angular acceleration of each joint.',
-                        required=False, default=False)
-    parser.add_argument('--plot_acc', help='Plot the angular acceleration for 3 samples.',
-                        required=False, default=False)
-    parser.add_argument('--joint_num', help='Name of the joint to plot the angular acceleration for 3 samples.',
-                        required=False, default="0")
-    parser.add_argument('--plot_effort', help='Plot the effort.',
-                        required=False, default=False)
-    parser.add_argument('--get_effort_sum', help='Get the sum of torque for each joint.',
-                        required=False, default=False)
-    parser.add_argument('--plot_position', help='Plot the position of each individual joint',
-                        required=False, default=False)
-    parser.add_argument('--num_samples', help='Number of samples to plot.',
-                        required=False, default="300")
+# +++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+def read_json_data():
+    # Opening JSON file
+    with open(json_file) as file:
+        jsonData = json.load(file)
 
-    args = parser.parse_args()
-
-    json_file_1 = "/home/filipe/Desktop/Dissertação/" + args.job_name_1 + ".json"
-    json_file_2 = "/home/filipe/Desktop/Dissertação/" + args.job_name_2 + ".json"
-
-    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
-                    "joint_5", "joint_6", "joint_7", "joint_8"]
-
-    if args.save_data:
-        listener_ros_topics()
-
-    if args.read_data:
-        jsonData = read_json_data(json_file_1)
-
-    if args.get_angular_acc_sum:
-        jsonData_1 = read_json_data(json_file_1)
-        jsonData_2 = read_json_data(json_file_2)
-        ang_acceleration_1 = get_angular_acceleration(jsonData_1, int(args.num_samples))
-        ang_acceleration_2 = get_angular_acceleration(jsonData_2, int(args.num_samples))
-        acc_sum_1 = get_angular_acceleration_sum(ang_acceleration_1, int(args.num_samples))
-        acc_sum_2 = get_angular_acceleration_sum(ang_acceleration_2, int(args.num_samples))
-
-        print("Angular acceleration ini: ")
-        print(acc_sum_1)
-        print("Angular acceleration end: ")
-        print(acc_sum_2)
-
-    if args.plot_acc:
-        jsonData_1 = read_json_data(json_file_1)
-        jsonData_2 = read_json_data(json_file_2)
-        get_multiple_angular_acceleration(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
-
-    if args.plot_effort:
-        jsonData_1 = read_json_data(json_file_1)
-        jsonData_2 = read_json_data(json_file_2)
-        plot_effort(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
-
-    if args.get_effort_sum:
-        jsonData_1 = read_json_data(json_file_1)
-        jsonData_2 = read_json_data(json_file_2)
-        eff_sum_1 = get_effort_sum(jsonData_1, int(args.num_samples))
-        eff_sum_2 = get_effort_sum(jsonData_2, int(args.joint_num))
-
-        print("Torque ini: ")
-        print(eff_sum_1)
-        print("Torque end: ")
-        print(eff_sum_2)
-
-    if args.plot_position:
-        jsonData_1 = read_json_data(json_file_1)
-        jsonData_2 = read_json_data(json_file_2)
-        plot_position(jsonData_1, jsonData_2, int(args.num_samples), int(args.joint_num))
+    return jsonData
 
 
 def get_valid_frames():
@@ -630,9 +554,32 @@ def get_valid_frames():
 
         if actual_stamp[9] != previous_stamp[9]:
             valid_seq.append(jsonData["frames"][i]["header"]["seq"])
-            #print(actual_stamp)
+            # for debug
+            # print("---------------------------------------------------------")
+            # print("Sequence  : ", jsonData["frames"][i]["header"]["seq"])
+            # print("Timestamp : ", jsonData["frames"][i]["header"]["stamp"])
+            # print("Time      : ", actual_stamp)
 
     return valid_seq
+
+
+def total_effort_per_joint(valid_seq):
+    total_frames = len(jsonData["frames"])
+    effort = np.empty(shape=(len(listOfJoints)))
+    effort.fill(0)
+
+    for i in range(len(listOfJoints)):
+        # For debug only
+        #print("-------------------- Joint " + str(i) + " --------------------")
+
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
+                effort[i] += abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+                # For debug only
+                #print("Seq    : ", str(jsonData["frames"][j]["header"]["seq"]))
+                #print("Effort :      " + str(jsonData["frames"][j][listOfJoints[i]]["effort"]))
+
+    return effort
 
 
 def get_cycle_time():
@@ -667,23 +614,195 @@ def get_effort_array(valid_seq):
     return data_array
 
 
-def total_effort_per_joint(valid_seq):
+def get_angular_acc_array(valid_frames):
     total_frames = len(jsonData["frames"])
-    effort = np.empty(shape=(len(listOfJoints)))
-    effort.fill(0)
+    data_array = np.empty(shape=(len(listOfJoints), len(valid_frames)))
+    data_array.fill(0)
 
     for i in range(len(listOfJoints)):
+        # For debug only
+        #print("-------------------- Joint " + str(i) + " --------------------")
+
+        aux = 0
         for j in range(0, total_frames):
-            if jsonData["frames"][j]["header"]["seq"] in valid_seq:
-                effort[i] += abs(jsonData["frames"][j][listOfJoints[i]]["effort"])
+            if jsonData["frames"][j]["header"]["seq"] in valid_frames:
+                idx_valid_frames = valid_frames.index(jsonData["frames"][j]["header"]["seq"])
 
-    return effort
+                next_idx_value_valid_frames = idx_valid_frames + 1
+
+                if next_idx_value_valid_frames < len(valid_frames):
+                    valid_frames_next_frame = valid_frames[next_idx_value_valid_frames]
+                else:
+                    valid_frames_next_frame = len(valid_frames)
+
+                velocity_now = jsonData["frames"][j][listOfJoints[i]]["velocity"]
+
+                velocity_next = 0
+                for k in range(0, total_frames):
+                    if jsonData["frames"][k]["header"]["seq"] == valid_frames_next_frame:
+                        velocity_next = jsonData["frames"][k][listOfJoints[i]]["velocity"]
+
+                data_array[i][aux] = (velocity_next - velocity_now) / 0.1
+                aux += 1
+
+                # for debug only
+                #print("seq in jsonData             : ", jsonData["frames"][j]["header"]["seq"])
+                #print("idx_valid_frames            : ", idx_valid_frames)
+                #print("next_idx_value_valid_frames : ", next_idx_value_valid_frames)
+                #print("valid_frames_next_frame     : ", valid_frames_next_frame)
+                #print("velocity_now                : ", velocity_now)
+                #print("velocity_next               : ", velocity_next)
+                #print("delta velocity              : ", (velocity_next - velocity_now))
+                #print("")
+
+    return data_array
 
 
-valid_frames = get_valid_frames()
-effort_array = get_effort_array(valid_frames)
-val = total_effort_per_joint(valid_frames)
-ct = get_cycle_time();
-print("total effort : ", sum(val))
-print("Cycle time   : ", ct)
+def get_valid_timestamp_frame(valid_frames):
+    total_frames = len(jsonData["frames"])
+    timestamp_array = []
+
+    for k in range(0, total_frames):
+        if jsonData["frames"][k]["header"]["seq"] == valid_frames[0]:
+            first_timestamp = datetime.fromtimestamp(int(jsonData["frames"][k]["header"]["stamp"]) / 1e9)
+
+    start_time = str(first_timestamp.time())
+
+    t1 = datetime.strptime(start_time, "%H:%M:%S.%f")
+    # print('Start time:', t1.time())
+
+    for i in range(0, total_frames):
+        if jsonData["frames"][i]["header"]["seq"] in valid_frames:
+            actual_stamp = datetime.fromtimestamp(int(jsonData["frames"][i]["header"]["stamp"]) / 1e9)
+            end_time = str(actual_stamp.time())
+            t2 = datetime.strptime(end_time, "%H:%M:%S.%f")
+
+            delta = t2 - t1
+            timestamp_array.append(round(delta.total_seconds(), 2))
+            # print("delta : ", round(delta.total_seconds(), 2))
+
+    return timestamp_array
+
+
+def plot_effort_sim(_effort_array, _timestamp_array, joint_num):
+    plt.title("Reinforcement Learning - " + listOfJoints[joint_num])
+    plt.xlabel("Duration (s)")
+    plt.ylabel("Torque (Nm)")
+
+    plt.plot(_timestamp_array, _effort_array[joint_num])
+    plt.xticks(np.linspace(0.0, timestamp_array[-1], num=10))
+    plt.xticks(rotation=90)
+
+    plt.show()
+
+
+
+def plot_angular_acc_sim(_angular_acc_array, _timestamp_array, joint_num):
+    plt.title("Reinforcement Learning - " + listOfJoints[joint_num])
+    plt.xlabel("Duration (s)")
+    plt.ylabel("Angular Acceleration (rad/s²)")
+
+    plt.plot(_timestamp_array, _angular_acc_array[joint_num])
+    #plt.xticks(np.linspace(0.0, timestamp_array[-1], num=10))
+    plt.xticks(rotation=90)
+
+    plt.show()
+
+
+def get_position_array(valid_frames):
+    total_frames = len(jsonData["frames"])
+    data_array = np.empty(shape=(len(listOfJoints), len(valid_frames)))
+    data_array.fill(0)
+
+    for i in range(len(listOfJoints)):
+        aux = 0
+        for j in range(0, total_frames):
+            if jsonData["frames"][j]["header"]["seq"] in valid_frames:
+                data_array[i][aux] = jsonData["frames"][j][listOfJoints[i]]["position"]
+                aux += 1
+
+    return data_array
+
+
+def plot_position_sim(_position_array, _timestamp_array, _joint_num):
+    plt.title("Reinforcement Learning - " + listOfJoints[_joint_num])
+    plt.xlabel("Duration (s)")
+    plt.ylabel("Position")
+
+    plt.plot(_timestamp_array, _position_array[_joint_num])
+    plt.xticks(np.linspace(0.0, timestamp_array[-1], num=10))
+    plt.xticks(rotation=90)
+
+    plt.show()
+
+
+if __name__ == '__main__':
+    # Define and parse input arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--save_data', help='Save data from ROS topics.',
+                        required=False, default=False)
+    parser.add_argument('--task_name', help='Save data from ROS topics.',
+                        required=False, default="phase_2_0")
+    parser.add_argument('--read_data', help='Read data from json file.',
+                        required=False, default=False)
+    parser.add_argument('--plot_acc', help='Plot the angular acceleration of each individual joint.',
+                        required=False, default=False)
+    parser.add_argument('--joint_num', help='Name of the joint to plot the angular acceleration for 3 samples.',
+                        required=False, default="1")
+    parser.add_argument('--plot_effort', help='Plot the effort of each individual joint.',
+                        required=False, default=False)
+    parser.add_argument('--plot_position', help='Plot the position of each individual joint',
+                        required=False, default=False)
+
+    args = parser.parse_args()
+
+    json_file = "/home/filipe/Desktop/Dissertação/" + args.task_name + ".json"
+
+    listOfJoints = ["joint_0", "joint_1", "joint_2", "joint_3", "joint_4",
+                    "joint_5", "joint_6", "joint_7", "joint_8"]
+
+    if args.save_data:
+        listener_ros_topics()
+
+    if args.read_data:
+        jsonData = read_json_data()
+        valid_frames = get_valid_frames()
+        effort_joint = total_effort_per_joint(valid_frames)
+        cycle_time = get_cycle_time()
+        print("total effort : " + str(round(sum(effort_joint))) + " Nm")
+        print("Cycle time   : " + str(round(float(cycle_time), 2)) + " s")
+
+    if args.plot_acc:
+        jsonData = read_json_data()
+        valid_frames = get_valid_frames()
+        angular_acc_array = get_angular_acc_array(valid_frames)
+        timestamp_array = get_valid_timestamp_frame(valid_frames)
+        plot_angular_acc_sim(angular_acc_array, timestamp_array, int(args.joint_num))
+
+    if args.plot_effort:
+        jsonData = read_json_data()
+        valid_frames = get_valid_frames()
+        effort_array = get_effort_array(valid_frames)
+        timestamp_array = get_valid_timestamp_frame(valid_frames)
+        plot_effort_sim(effort_array, timestamp_array, int(args.joint_num))
+
+    if args.plot_position:
+        jsonData = read_json_data()
+        valid_frames = get_valid_frames()
+        position_array = get_position_array(valid_frames)
+        timestamp_array = get_valid_timestamp_frame(valid_frames)
+        plot_position_sim(position_array, timestamp_array, int(args.joint_num))
+
+
+
+
+
+
+
+
+
+
+
+
+
 
