@@ -30,13 +30,19 @@ env:
   controlType: osc  # options are {joint_tor, osc}
 
 #     #[-0.43882057  0.41084743 -0.06583226 -1.9140093   0.03765289  2.3219993, 0.26197127  0.04 0.04]
-  frankaId: 30 #8
+  phase_2_2: 51 #48 26 18 22
+  phase_2_1: 25 #19 48 18 14
+  phase_2_0: 42 #19 30 24 49
+  phase_1_0: 11 #48 17 22 10
+  phase_0_0: 30 #22 49 25 17
+
+  frankaId: 51
   cubeACoordinates: [0.05, 0.3]
   cubeBCoordinates: [0.10, -0.3]
-  randomCubeABPosition: True
-  optimize: True
-  justOneTest: True
-  enableFindHighestReward: True
+  train: False
+  randomCubePosition: False
+  justOneTest: False
+  enableFindHighestReward: False
   enableRos: True
 
   asset:

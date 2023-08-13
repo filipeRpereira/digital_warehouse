@@ -46,6 +46,7 @@ from moveit_msgs.msg import MoveItErrorCodes
 from std_msgs.msg import Header
 import std_msgs.msg
 
+
 rospy.init_node("isaac_gym", anonymous=False)
 joint_command_isaac = JointState()
 pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
@@ -112,27 +113,28 @@ class FrankaCubeStack(VecTask):
         self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
         self.aggregate_mode = self.cfg["env"]["aggregateMode"]
 
-        self.optimize = self.cfg["env"]["optimize"]
+        self.train = self.cfg["env"]["train"]
+        self.random_cube_position = self.cfg["env"]["randomCubePosition"]
         self.just_one_test = self.cfg["env"]["justOneTest"]
         self.enable_ros = self.cfg["env"]["enableRos"]
 
-        if self.optimize:
-            self.start_position_noise = 0.0 #0.20
-            self.start_rotation_noise = 0.0 #0.785
+        if self.train:
+            self.start_position_noise = 0.20
+            self.start_rotation_noise = 0.785
             self.franka_position_noise = 0.0
             self.franka_rotation_noise = 0.0
-            self.franka_dof_noise = 0.0 #0.25
+            self.franka_dof_noise = 0.25
+
         else:
-            self.start_position_noise = self.cfg["env"]["startPositionNoise"]
-            self.start_rotation_noise = self.cfg["env"]["startRotationNoise"]
-            self.franka_position_noise = self.cfg["env"]["frankaPositionNoise"]
-            self.franka_rotation_noise = self.cfg["env"]["frankaRotationNoise"]
-            self.franka_dof_noise = self.cfg["env"]["frankaDofNoise"]
+            self.start_position_noise = 0.0
+            self.start_rotation_noise = 0.0
+            self.franka_position_noise = 0.0
+            self.franka_rotation_noise = 0.0
+            self.franka_dof_noise = 0.0
 
         self.enable_find_highest_reward = self.cfg["env"]["enableFindHighestReward"]
         self.cube_A_coordinates = self.cfg["env"]["cubeACoordinates"]
         self.cube_B_coordinates = self.cfg["env"]["cubeBCoordinates"]
-
 
 
         # Controller type
@@ -575,13 +577,13 @@ class FrankaCubeStack(VecTask):
             this_cube_state_all = self._init_cubeA_state
             other_cube_state = self._init_cubeB_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
-            if self.optimize:
+            if not self.random_cube_position:
                 centered_cube_xy_state = torch.tensor(self.cube_A_coordinates, device=self.device, dtype=torch.float32)
         elif cube.lower() == 'b':
             this_cube_state_all = self._init_cubeB_state
             other_cube_state = self._init_cubeA_state[env_ids, :]
             cube_heights = self.states["cubeA_size"]
-            if self.optimize:
+            if not self.random_cube_position:
                 centered_cube_xy_state = torch.tensor(self.cube_B_coordinates, device=self.device, dtype=torch.float32)
         else:
             raise ValueError(f"Invalid cube specified, options are 'A' and 'B'; got: {cube}")
@@ -663,6 +665,7 @@ class FrankaCubeStack(VecTask):
 
         return u
 
+
     def pre_physics_step(self, actions):
         self.actions = actions.clone().to(self.device)
 
@@ -693,6 +696,7 @@ class FrankaCubeStack(VecTask):
 
         if self.enable_ros:
             self.get_joints_values(int(self.reward_settings["franka_id"]))
+
 
     def post_physics_step(self):
         self.progress_buf += 1
@@ -933,13 +937,8 @@ def compute_franka_reward(
                           rewards)
 
     # evaluation
-    phase_2_2 = 143
-    phase_2_1 = 495
-    phase_2_0 = 143
-    phase_0 = 245
 
     # total torque
-    # Metrics
     torque_total_metric = 0.30 * reward_torque_joint_0 + 0.3 * reward_torque_joint_1 + 0.2 * reward_torque_joint_2 + \
                           0.1 * reward_torque_joint_3 + 0.05 * reward_torque_joint_4 + 0.03 * reward_torque_joint_5 + \
                           0.02 * reward_torque_joint_6
@@ -966,8 +965,8 @@ def compute_franka_reward(
     '''
 
     # Compute resets
-    #reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (task_completed > 0), torch.ones_like(reset_buf),
-    #                        reset_buf)
-    reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf), reset_buf)
+    reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (task_completed > 0), torch.ones_like(reset_buf),
+                            reset_buf)
+    #reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf, cycle_time_new, new_torque
