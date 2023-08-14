@@ -49,7 +49,7 @@ import std_msgs.msg
 
 rospy.init_node("isaac_gym", anonymous=False)
 joint_command_isaac = JointState()
-pub = rospy.Publisher("/joint_states", JointState, queue_size=20)
+pub = rospy.Publisher("/joint_states_gym", JointState, queue_size=20)
 
 @torch.jit.script
 def axisangle2quat(vec, eps=1e-6):
@@ -491,7 +491,7 @@ class FrankaCubeStack(VecTask):
         self.rew_buf[:], self.reset_buf[:], self.cycle_time_max, self.torque_total = compute_franka_reward(
             self.reset_buf, self.progress_buf, self.actions, self.states, self.reward_settings, self.max_episode_length,
             self.cycle_time_max, self.torque_total, self._effort_control, self.reward_settings["franka_id"],
-            self.cfg["env"]["numEnvs"]
+            self.cfg["env"]["numEnvs"], self.train
         )
 
     def compute_observations(self):
@@ -754,26 +754,27 @@ class FrankaCubeStack(VecTask):
 
         # Positions
         for i in range(7):
-            joint_state_position = np.array(self._q[env_num][i].item())
+            joint_state_position = np.array(round(self._q[env_num][i].item(), 5))
             positions.append(joint_state_position)
         for i in range(2):
-            gripper_state_position = np.array(self._gripper_control[env_num, i].item())
+            gripper_state_position = np.array(round(self._gripper_control[env_num, i].item(), 5))
             positions.append(gripper_state_position)
 
         # Velocity
         for i in range(7):
-            joint_state_velocity = np.array(self._qd[env_num][i].item())
+            joint_state_velocity = np.array(round(self._qd[env_num][i].item(), 5))
             velocity.append(joint_state_velocity)
         for i in range(2):
-            gripper_state_velocity = np.array(self.states["eef_vel"][env_num, i].item())
+            gripper_state_velocity = np.array(round(self.states["eef_vel"][env_num, i].item(), 5))
             velocity.append(gripper_state_velocity)
 
         # Effort
-        for i in range(7):
-            joint_state_effort = np.array(self._arm_control[env_num][i].item())
+        effort.append(np.array(self._effort_control[env_num][8].item()))
+        for i in range(0, 6):
+            joint_state_effort = np.array(round(self._effort_control[env_num][i].item(), 5))
             effort.append(joint_state_effort)
         for i in range(2):
-            gripper_state_effort = np.array(self._gripper_control[env_num, i].item())
+            gripper_state_effort = np.array(round(self._gripper_control[env_num, i].item(), 5))
             effort.append(gripper_state_effort)
 
         joint_command_isaac.header.stamp = rospy.Time.now()
@@ -800,8 +801,8 @@ class FrankaCubeStack(VecTask):
 @torch.jit.script
 def compute_franka_reward(
         reset_buf, progress_buf, actions, states, reward_settings, max_episode_length, cycle_time_old, torque,
-        effort_control, franka_id, envs):
-    # type: (Tensor, Tensor, Tensor, Dict[str, Tensor], Dict[str, float], float, Tensor, Tensor, Tensor, int, int) -> Tuple[Tensor, Tensor, Tensor, Tensor]
+        effort_control, franka_id, envs, train):
+    # type: (Tensor, Tensor, Tensor, Dict[str, Tensor], Dict[str, float], float, Tensor, Tensor, Tensor, int, int, int) -> Tuple[Tensor, Tensor, Tensor, Tensor]
 
     # Compute per-env physical parameters
     target_height = states["cubeB_size"] + states["cubeA_size"] / 2.0
@@ -831,8 +832,6 @@ def compute_franka_reward(
     # final reward for stacking successfully (only if cubeA is close to target height and corresponding location, and gripper is not grasping)
     cubeA_align_cubeB = (torch.norm(states["cubeA_to_cubeB_pos"][:, :2], dim=-1) < 0.02)
     cubeA_on_cubeB = torch.abs(cubeA_height - target_height) < 0.02
-    gripper_away_from_cubeA = (d > 0.15)
-    stack_reward = cubeA_align_cubeB & cubeA_on_cubeB & gripper_away_from_cubeA
 
     # drop-off of cube A on cube B
     drop_d_lf = torch.norm(states["cubeA_pos"] - states["eef_lf_pos"], dim=-1)
@@ -881,7 +880,6 @@ def compute_franka_reward(
     save_cycle_time = ((cycle_time_old == 0) & end_cycle_time)
     cycle_time_new = torch.where(save_cycle_time, cycle_time, cycle_time_old)
     cycle_time_new = torch.where((progress_buf < 50), torch.zeros_like(cycle_time_new), cycle_time_new)
-    # print("cycle_time_new: ", cycle_time_new[0:10])
 
     rewards = torch.where(end_cycle_time,
                           5 * cycle_time_new +
@@ -937,12 +935,6 @@ def compute_franka_reward(
                           rewards)
 
     # evaluation
-
-    # total torque
-    torque_total_metric = 0.30 * reward_torque_joint_0 + 0.3 * reward_torque_joint_1 + 0.2 * reward_torque_joint_2 + \
-                          0.1 * reward_torque_joint_3 + 0.05 * reward_torque_joint_4 + 0.03 * reward_torque_joint_5 + \
-                          0.02 * reward_torque_joint_6
-
     total_torque = 0
     for i in range(7):
         total_torque += new_torque[franka_id:franka_id+1, i].item()
@@ -951,22 +943,22 @@ def compute_franka_reward(
     for i in range(envs):
         if end_cycle_time[i]:
             aux = aux + 1
-    '''
+
     if aux > 0:
         print("--------------------------------------------")
-        print("Task completed      : ", aux)
+        print("End Cycle Time      : ", aux)
         print("--------------------------------------------")
-
     if end_drop_off[franka_id]:
         print("end_position_reward : ", end_position_reward[franka_id].item())
         print("cycle_time_new      : ", int(max_episode_length - cycle_time_new[franka_id].item()*100))
         print("total_torque        : ", total_torque)
         print("rewards             : ", rewards[franka_id].item())
-    '''
+        print("--------------------------------------------")
 
     # Compute resets
-    reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (task_completed > 0), torch.ones_like(reset_buf),
-                            reset_buf)
-    #reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (stack_reward > 0), torch.ones_like(reset_buf), reset_buf)
+    if train:
+        reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (task_completed > 0), torch.ones_like(reset_buf), reset_buf)
+    else:
+        reset_buf = torch.where((progress_buf >= max_episode_length - 1) | (end_cycle_time > 0), torch.ones_like(reset_buf), reset_buf)
 
     return rewards, reset_buf, cycle_time_new, new_torque
