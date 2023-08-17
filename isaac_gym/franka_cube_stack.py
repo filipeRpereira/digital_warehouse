@@ -47,9 +47,9 @@ from std_msgs.msg import Header
 import std_msgs.msg
 
 
-rospy.init_node("isaac_gym", anonymous=False)
-joint_command_isaac = JointState()
-pub = rospy.Publisher("/joint_states_gym", JointState, queue_size=20)
+#rospy.init_node("isaac_gym", anonymous=False)
+#joint_command_isaac = JointState()
+#pub = rospy.Publisher("/joint_states_gym", JointState, queue_size=20)
 
 @torch.jit.script
 def axisangle2quat(vec, eps=1e-6):
@@ -694,8 +694,8 @@ class FrankaCubeStack(VecTask):
         self.gym.set_dof_position_target_tensor(self.sim, gymtorch.unwrap_tensor(self._pos_control))
         self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self._effort_control))
 
-        if self.enable_ros:
-            self.get_joints_values(int(self.reward_settings["franka_id"]))
+        #if self.enable_ros:
+        #    self.get_joints_values(int(self.reward_settings["franka_id"]))
 
 
     def post_physics_step(self):
@@ -777,13 +777,13 @@ class FrankaCubeStack(VecTask):
             gripper_state_effort = np.array(round(self._gripper_control[env_num, i].item(), 5))
             effort.append(gripper_state_effort)
 
-        joint_command_isaac.header.stamp = rospy.Time.now()
-        joint_command_isaac.header.frame_id = "Isaac Gym"
-        joint_command_isaac.name = joint_names
-        joint_command_isaac.position = positions
-        joint_command_isaac.velocity = velocity
-        joint_command_isaac.effort = effort
-        pub.publish(joint_command_isaac)
+        #joint_command_isaac.header.stamp = rospy.Time.now()
+        #joint_command_isaac.header.frame_id = "Isaac Gym"
+        #joint_command_isaac.name = joint_names
+        #joint_command_isaac.position = positions
+        #joint_command_isaac.velocity = velocity
+        #joint_command_isaac.effort = effort
+        #pub.publish(joint_command_isaac)
 
 
     def find_max_reward(self):
@@ -872,7 +872,7 @@ def compute_franka_reward(
                           rewards)
 
     # task completed
-    task_completed = cubeA_align_cubeB & cubeA_on_cubeB & end_drop_off & (end_position_reward > 3.5)
+    task_completed = cubeA_align_cubeB & cubeA_on_cubeB & end_drop_off & (end_position_reward > 4.0)
 
     # cycle time (number of epoch to conclude the task)
     end_cycle_time = cubeA_align_cubeB & cubeA_on_cubeB & end_drop_off & (d > 0.12)
@@ -889,7 +889,6 @@ def compute_franka_reward(
     # torque
     new_torque = abs(torque) + abs(effort_control)
 
-    #'''
     new_torque[:, 0] = torch.where(end_cycle_time, abs(torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where(end_cycle_time, abs(torque[:, 1]), new_torque[:, 1])
     new_torque[:, 2] = torch.where(end_cycle_time, abs(torque[:, 2]), new_torque[:, 2])
@@ -897,7 +896,6 @@ def compute_franka_reward(
     new_torque[:, 4] = torch.where(end_cycle_time, abs(torque[:, 4]), new_torque[:, 4])
     new_torque[:, 5] = torch.where(end_cycle_time, abs(torque[:, 5]), new_torque[:, 5])
     new_torque[:, 6] = torch.where(end_cycle_time, abs(torque[:, 6]), new_torque[:, 6])
-    #'''
 
     new_torque[:, 0] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 0]), new_torque[:, 0])
     new_torque[:, 1] = torch.where((progress_buf < 1), torch.zeros_like(new_torque[:, 1]), new_torque[:, 1])
@@ -924,13 +922,13 @@ def compute_franka_reward(
     reward_torque_joint_6 = 1 - torque_joint_6
 
     rewards = torch.where(end_cycle_time,
-                          30.0*(0.30 * reward_torque_joint_0 +
+                          40.0*(0.30 * reward_torque_joint_0 +
                           0.30 * reward_torque_joint_1 +
                           0.20 * reward_torque_joint_2 +
                           0.10 * reward_torque_joint_3 +
-                          0.05 * reward_torque_joint_4 +
-                          0.03 * reward_torque_joint_5 +
-                          0.02 * reward_torque_joint_6) +
+                          0.02 * reward_torque_joint_4 +
+                          0.02 * reward_torque_joint_5 +
+                          0.01 * reward_torque_joint_6) +
                           rewards,
                           rewards)
 
@@ -948,7 +946,7 @@ def compute_franka_reward(
         print("--------------------------------------------")
         print("End Cycle Time      : ", aux)
         print("--------------------------------------------")
-    if end_drop_off[franka_id]:
+    if end_cycle_time[franka_id]:
         print("end_position_reward : ", end_position_reward[franka_id].item())
         print("cycle_time_new      : ", int(max_episode_length - cycle_time_new[franka_id].item()*100))
         print("total_torque        : ", total_torque)
