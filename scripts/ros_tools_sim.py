@@ -424,15 +424,31 @@ def get_valid_frames():
         actual_stamp = jsonData["frames"][i]["header"]["stamp"]
         if len(previous_stamp) == 9:
             _previous_stamp = '0.' + previous_stamp
-        else:
+
+        elif len(previous_stamp) == 10:
             _previous_stamp = previous_stamp[0] + '.' + previous_stamp[1:]
+
+        elif len(previous_stamp) == 11:
+            _previous_stamp = previous_stamp[0:2] + '.' + previous_stamp[2:]
 
         if len(actual_stamp) == 9:
             _actual_stamp = '0.' + actual_stamp
-        else:
+        elif len(actual_stamp) == 10:
             _actual_stamp = actual_stamp[0] + '.' + actual_stamp[1:]
+        elif len(actual_stamp) > 10:
+            _actual_stamp = actual_stamp[0:2] + '.' + actual_stamp[2:]
 
-        if _actual_stamp[2] != _previous_stamp[2]:
+        if _actual_stamp[1] == '.':
+            indx_atual = 1
+        elif _actual_stamp[2] == '.':
+            indx_atual = 2
+
+        if _previous_stamp[1] == '.':
+            indx_previous = 1
+        elif _previous_stamp[2] == '.':
+            indx_previous = 2
+
+        if _actual_stamp[indx_atual+1] != _previous_stamp[indx_previous+1]:
             valid_seq.append(jsonData["frames"][i]["header"]["seq"])
 
             # for debug
@@ -449,8 +465,11 @@ def get_cycle_time():
 
     if len(cycle_time) == 9:
         _cycle_time = '0.' + cycle_time
-    else:
+    elif len(cycle_time) == 10:
         _cycle_time = cycle_time[0] + '.' + cycle_time[1:]
+    elif len(cycle_time) > 10:
+        _cycle_time = cycle_time[0:2] + '.' + cycle_time[1:]
+    print(cycle_time[0:2])
 
     return _cycle_time
 
@@ -530,6 +549,9 @@ def get_valid_timestamp_frame(valid_frames):
     total_frames = len(jsonData["frames"])
     timestamp_array = []
 
+    #100000005
+    #15316667465
+
     for i in range(0, total_frames):
         if jsonData["frames"][i]["header"]["seq"] in valid_frames:
             timestamp_array.append(jsonData["frames"][i]["header"]["stamp"])
@@ -538,8 +560,10 @@ def get_valid_timestamp_frame(valid_frames):
     for i in range(len(timestamp_array)):
         if len(timestamp_array[i]) == 9:
             timestamp_array[i] = round(float('0.' + timestamp_array[i]), 2)
-        else:
+        elif len(timestamp_array[i]) == 10:
             timestamp_array[i] = round(float(timestamp_array[i][0] + '.' + timestamp_array[i][1:]), 2)
+        elif len(timestamp_array[i]) == 11:
+            timestamp_array[i] = round(float(timestamp_array[i][0:2] + '.' + timestamp_array[i][2:]), 2)
 
     return timestamp_array
 
@@ -618,6 +642,7 @@ if __name__ == '__main__':
         cycle_time = get_cycle_time()
         print("Total effort : " + str(round(sum(effort_joint))) + " Nm")
         print("Cycle time   : " + str(round(float(cycle_time), 2)) + " s")
+        #print(valid_frames)
 
     if args.plot_acc:
         jsonData = read_json_data()

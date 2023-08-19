@@ -365,7 +365,7 @@ def save_json_data(data):
     with open(json_file, "w") as file:
         json.dump(dataFromJsonFile, file)
 
-    if str(data.header.seq) == "320":
+    if str(data.header.seq) == "600":
         jointStates_sub.unregister()
         print("")
         print("")

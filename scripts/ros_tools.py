@@ -147,7 +147,7 @@ def plot_effort_sim(_effort_array_0, _effort_array_1, _effort_array_2,
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    plt.legend(["Manual Programming", "RL without optimization", "RL with optimization"], loc="lower right")
+    plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
 
     plt.show()
 
@@ -165,7 +165,7 @@ def plot_angular_acc_sim(_angular_acc_array_0, _angular_acc_array_1, _angular_ac
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    plt.legend(["Manual Programming", "RL without optimization", "RL with optimization"], loc="lower right")
+    plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
 
     plt.show()
 
@@ -215,9 +215,9 @@ if __name__ == '__main__':
     parser.add_argument('--task_name_0', help='Save data from ROS topics.',
                         required=False, default="sim")
     parser.add_argument('--task_name_1', help='Save data from ROS topics.',
-                        required=False, default="phase_1_54")
+                        required=False, default="phase_2_27")
     parser.add_argument('--task_name_2', help='Save data from ROS topics.',
-                        required=False, default="phase_2_54")
+                        required=False, default="phase_2_27_drag")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration of each individual joint.',
