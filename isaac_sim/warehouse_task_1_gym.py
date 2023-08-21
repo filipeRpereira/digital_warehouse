@@ -51,26 +51,32 @@ class FrankaPlaying(BaseTask):
         
         self._table = scene.add(FixedCuboid(prim_path="/World/table",
                                             name="table",
-                                            position=np.array([-0.075, 0.0, 0.05]),
-                                            scale=np.array([1.1, 1.0, 0.1]),
+                                            #position=np.array([0.0, 0.0, 0.05]),
+                                            position=np.array([0.0, 0.0, 1.0]),
+                                            #scale=np.array([1.2, 1.2, 0.1]),
+                                            scale=np.array([1.2, 1.2, 0.05]),
                                             color=np.array([0.5, 0.1, 0.1])))
         
         self._franka_base = scene.add(FixedCuboid(prim_path="/World/_franka_base",
                                             name="_franka_base",
-                                            position=np.array([-0.48, 0.0, 0.15]),
-                                            scale=np.array([0.23, 0.2, 0.125]),
+                                            #position=np.array([-0.50, 0.0, 0.15]),
+                                            position=np.array([-0.45, 0.0, 1.075]),
+                                            #scale=np.array([0.2, 0.2, 0.125]),
+                                            scale=np.array([0.2, 0.2, 0.1]),
                                             color=np.array([0.2, 0.4, 0.8])))
         
         self._cubeA = scene.add(DynamicCuboid(prim_path="/World/cubeA",
                                             name="cubeA",
-                                            position=np.array([0.05, 0.3, 0.13]),
-                                            scale=np.array([0.05, 0.05, 0.05]),
+                                            #position=np.array([0.05, 0.3, 0.13]),
+                                            position=np.array([0.05, 0.305, 1.050]),
+                                            scale=np.array([0.04, 0.04, 0.04]),
                                             color=np.array([0, 0, 1.0])))
 
         
         self._cubeB = scene.add(DynamicCuboid(prim_path="/World/cubeB",
                                             name="cubeB",
-                                            position=np.array([0.1, -0.3, 0.13]),
+                                            #position=np.array([0.1, -0.3, 0.060]),
+                                            position=np.array([0.06, -0.3, 1.060]),
                                             scale=np.array([0.07, 0.07, 0.07]),
                                             color=np.array([0, 0.4, 0.1])))
         
@@ -79,7 +85,8 @@ class FrankaPlaying(BaseTask):
         scene.add_default_ground_plane()
         self._franka = scene.add(Franka(prim_path="/World/Fancy_Franka",
                                         name="fancy_franka",
-                                        position=np.array([-0.45, 0.0, 0.215])))
+                                        #position=np.array([-0.45, 0.0, 0.215])))
+                                        position=np.array([-0.43, 0.0, 1.125])))
         
 
         #self.create_sensor()
@@ -264,6 +271,7 @@ class FrankaPlaying(BaseTask):
                         ("ArticulationController.inputs:usePath", True),
                         ("ArticulationController.inputs:robotPath", franka_stage_path),
                         ("SubscribeJointState.inputs:topicName", "joint_states"),
+                        ("SubscribeJointState.inputs:queueSize", 1),
                         ("PublishJointState.inputs:topicName",   "joint_states_isaac"),
                     ],
                 },

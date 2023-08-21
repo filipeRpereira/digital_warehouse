@@ -2,10 +2,12 @@ from omni.isaac.examples.base_sample import BaseSample
 from omni.isaac.franka import Franka
 from omni.isaac.core.objects import DynamicCuboid, FixedCuboid
 from omni.isaac.franka.controllers import PickPlaceController
-from omni.isaac.core.tasks import BaseTask
+from omni.isaac.core.tasks import BaseTask, FollowTarget
 
 import omni.graph.core as og
 from omni.isaac.core_nodes.scripts.utils import set_target_prims
+
+from .path_planning_task import FrankaPathPlanningTask
 
 import numpy as np
 
@@ -343,10 +345,11 @@ class FrankaPlaying(BaseTask):
                         ("ros1_publish_imu_07.inputs:topicName", "imu_link7"),
                         ("ros1_publish_imu_08.inputs:topicName", "imu_link8"),
 
-                        ("SubscribeJointState.inputs:topicName", "joint_states"),
-                        ("PublishJointState.inputs:topicName",   "joint_states_isaac"),
+                        ("SubscribeJointState.inputs:topicName", "joint_states_sim"),
+                        ("PublishJointState.inputs:topicName",   "joint_states_sim"),
 
-                        ("OnTick.inputs:framePeriod", 10),
+                        ("OnTick.inputs:framePeriod", 0),
+                        ("ReadSimTime.inputs:resetOnStop", True),
                     ],
                 },
             )
@@ -411,15 +414,17 @@ class WarehouseTask1Manual(BaseSample):
         # The world already called the setup_scene from the task (with first reset of the world)
         # so we can retrieve the task objects
         self._franka = self._world.scene.get_object("fancy_franka")
+
         self._controller = PickPlaceController(
             name="pick_place_controller",
             gripper=self._franka.gripper,
             robot_articulation=self._franka,
-            end_effector_initial_height=0.20,
+            end_effector_initial_height=0.30,
             #events_dt = [0.008, 0.005, 1, 0.1, 0.05, 0.05, 0.0025, 1, 0.008, 0.08]
-            events_dt = [0.016, 0.008, 1, 0.2, 0.10, 0.10, 0.0025, 1, 0.008, 0.08]  #pickup velocity
+            events_dt = [0.016, 0.008, 1, 0.2, 0.10, 0.10, 0.0055, 1, 0.016, 0.1]  #pickup velocity
            
         )
+
         self._world.add_physics_callback("sim_step", callback_fn=self.physics_step)
         #await self._world.play_async()
         return
@@ -447,7 +452,13 @@ class WarehouseTask1Manual(BaseSample):
             current_joint_positions=current_observations["fancy_franka"]["joint_positions"],
         )
         self._franka.apply_action(actions)
+
         if self._controller.is_done():
+            f = open("demofile2.txt", "w")
+            f.write(str(current_observations["fancy_franka"]["joint_positions"]))
+            f.close()
+
+            #print(current_observations["fancy_franka"]["joint_positions"])
             self._world.pause()
         return
     
