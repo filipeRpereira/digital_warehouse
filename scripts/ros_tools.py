@@ -142,17 +142,18 @@ def plot_effort_sim(_effort_array_0, _effort_array_1, _effort_array_2,
 
     plt.plot(_timestamp_array_0, _effort_array_0[joint_num])
     plt.plot(_timestamp_array_1, _effort_array_1[joint_num])
-    plt.plot(_timestamp_array_2, _effort_array_2[joint_num])
+    #plt.plot(_timestamp_array_2, _effort_array_2[joint_num])
 
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
+    #plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
+    plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
 
     plt.show()
 
 
-def plot_angular_acc_sim(_angular_acc_array_0, _angular_acc_array_1, _angular_acc_array_2,
+def plot_angular_acc(_angular_acc_array_0, _angular_acc_array_1, _angular_acc_array_2,
                          _timestamp_array_0, _timestamp_array_1, _timestamp_array_2, joint_num):
     plt.title("Angular acceleration - " + listOfJoints[joint_num])
     plt.xlabel("Duration (s)")
@@ -160,12 +161,13 @@ def plot_angular_acc_sim(_angular_acc_array_0, _angular_acc_array_1, _angular_ac
 
     plt.plot(_timestamp_array_0, _angular_acc_array_0[joint_num])
     plt.plot(_timestamp_array_1, _angular_acc_array_1[joint_num])
-    plt.plot(_timestamp_array_2, _angular_acc_array_2[joint_num])
+    #plt.plot(_timestamp_array_2, _angular_acc_array_2[joint_num])
 
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
+    #plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
+    plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
 
     plt.show()
 
@@ -178,15 +180,31 @@ def get_valid_frames_sim(jsonData):
         actual_stamp = jsonData["frames"][i]["header"]["stamp"]
         if len(previous_stamp) == 9:
             _previous_stamp = '0.' + previous_stamp
-        else:
+
+        elif len(previous_stamp) == 10:
             _previous_stamp = previous_stamp[0] + '.' + previous_stamp[1:]
+
+        elif len(previous_stamp) == 11:
+            _previous_stamp = previous_stamp[0:2] + '.' + previous_stamp[2:]
 
         if len(actual_stamp) == 9:
             _actual_stamp = '0.' + actual_stamp
-        else:
+        elif len(actual_stamp) == 10:
             _actual_stamp = actual_stamp[0] + '.' + actual_stamp[1:]
+        elif len(actual_stamp) > 10:
+            _actual_stamp = actual_stamp[0:2] + '.' + actual_stamp[2:]
 
-        if _actual_stamp[2] != _previous_stamp[2]:
+        if _actual_stamp[1] == '.':
+            indx_atual = 1
+        elif _actual_stamp[2] == '.':
+            indx_atual = 2
+
+        if _previous_stamp[1] == '.':
+            indx_previous = 1
+        elif _previous_stamp[2] == '.':
+            indx_previous = 2
+
+        if _actual_stamp[indx_atual+1] != _previous_stamp[indx_previous+1]:
             valid_seq.append(jsonData["frames"][i]["header"]["seq"])
 
     return valid_seq
@@ -199,12 +217,15 @@ def get_valid_timestamp_frame_sim(jsonData, valid_frames):
     for i in range(0, total_frames):
         if jsonData["frames"][i]["header"]["seq"] in valid_frames:
             timestamp_array.append(jsonData["frames"][i]["header"]["stamp"])
+            # print(jsonData["frames"][i]["header"]["stamp"])
 
     for i in range(len(timestamp_array)):
         if len(timestamp_array[i]) == 9:
             timestamp_array[i] = round(float('0.' + timestamp_array[i]), 2)
-        else:
+        elif len(timestamp_array[i]) == 10:
             timestamp_array[i] = round(float(timestamp_array[i][0] + '.' + timestamp_array[i][1:]), 2)
+        elif len(timestamp_array[i]) == 11:
+            timestamp_array[i] = round(float(timestamp_array[i][0:2] + '.' + timestamp_array[i][2:]), 2)
 
     return timestamp_array
 
@@ -213,11 +234,11 @@ if __name__ == '__main__':
     # Define and parse input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--task_name_0', help='Save data from ROS topics.',
-                        required=False, default="sim")
+                        required=False, default="phase_0_27")
     parser.add_argument('--task_name_1', help='Save data from ROS topics.',
                         required=False, default="phase_2_27")
     parser.add_argument('--task_name_2', help='Save data from ROS topics.',
-                        required=False, default="phase_2_27_drag")
+                        required=False, default="phase_2_27")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration of each individual joint.',
@@ -265,7 +286,6 @@ if __name__ == '__main__':
         print("Total effort 2 : " + str(round(sum(effort_joint_2))) + " Nm")
         print("Cycle time   2 : " + str(round(float(cycle_time_2), 2)) + " s")
 
-
     if args.plot_acc:
         jsonData_0 = read_json_data(json_file_0)
         jsonData_1 = read_json_data(json_file_1)
@@ -284,7 +304,7 @@ if __name__ == '__main__':
         angular_acc_array_2 = get_angular_acc_array(jsonData_2, valid_frames_2)
         timestamp_array_2 = get_valid_timestamp_frame(jsonData_2, valid_frames_2)
 
-        plot_angular_acc_sim(angular_acc_array_0, angular_acc_array_1, angular_acc_array_2,
+        plot_angular_acc(angular_acc_array_0, angular_acc_array_1, angular_acc_array_2,
                              timestamp_array_0, timestamp_array_1, timestamp_array_2,
                              int(args.joint_num))
 
