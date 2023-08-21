@@ -105,47 +105,11 @@ The first task is to place a cube on top of another cube.
 Here is possible see the first teste, without any optimization.
 ![task_1_fase_0.gif](Images%2Ftask_1_fase_0.gif)
 
-In this case, you can see the final result with optimization of cycle time and energy consumption.\
-The way the robotic arm chose the path to place one cube on top of the other is very interesting.\
-As you can see, halfway through, the cube is on the table, because that way,
-the torque at each joint will be less.
+
 
 ![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
 
-#### Results 
-In the table bellow, are presented the results for each test for the task 1.
-
-| Test nº | Metric            | Initial | Optimization | Gain |
-|---------|-------------------|---------|--------------|------|
-| 1       | Cycle Time        | 199     | 147          | 26%  |
-| 1       | Power Consumption | 34843   | 13630        | 60%  |
-| 2       | Cycle Time        | 183     | 147          | 20%  |
-| 2       | Power Consumption | 59464   | 12861        | 78%  |
-| 3       | Cycle Time        | 195     | 138          | 29%  |
-| 3       | Power Consumption | 32881   | 12099        | 63%  |
-| 4       | Cycle Time        | 203     | 145          | 29%  |
-| 4       | Power Consumption | 34185   | 12594        | 63%  |
 
 ### Task 2
-The second task is to place a cube on top of another cube, but this time, there is a barrier between the two cubes.
-![task_2_fase_0.gif](Images%2Ftask_2_fase_0.gif)
-
-In this test, the results are similar to task 1. As you can see, until the cube hits the barrier, it is on the table.\
-Again, this shows that the torque at each joint is less this way.
-![task_2_fase_2.gif](Images%2Ftask_2_fase_2.gif)
-
-#### Results 
-In the table bellow, are presented the results for each test for the task 1.
-
-| Test nº | Metric            | Initial | Optimization | Gain |
-|---------|-------------------|---------|--------------|------|
-| 1       | Cycle Time        | 186     | 175          | 6%   |
-| 1       | Power Consumption | 29304   | 24109        | 18%  |
-| 2       | Cycle Time        | 178     | 180          | -1%  |
-| 2       | Power Consumption | 34084   | 24903        | 27%  |
-| 3       | Cycle Time        | 179     | 170          | 5%   |
-| 3       | Power Consumption | 33910   | 22802        | 22%  |
-| 4       | Cycle Time        | 179     | 170          | 5%   |
-| 4       | Power Consumption | 34023   | 23047        | 32%  |
 
 
