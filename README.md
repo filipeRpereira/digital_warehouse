@@ -100,13 +100,19 @@ initial results.
 * `--num_samples` - Number of ROS samples to analyse. Default `50`. Type: `string` 
 
 ## Tasks Results
-### Task 1
+### Task 1 Manual Programming
+![task_1_sim.gif](Images%2Ftask_1_sim.gif)
 
+### Task 1 Reinforcement Learning
 ![task_1.gif](Images%2Ftask_1.gif)
 
 
-### Task 2
+### Task 2 Manual Programming
+![task_2_sim.gif](Images%2Ftask_2_sim.gif)
+### Task 2 Reinforcement Learning
 ![task_2.gif](Images%2Ftask_2.gif)
 
-### Task 3
+### Task 3 Manual Programming
+![task_3_sim.gif](Images%2Ftask_3_sim.gif)
+### Task 3 Reinforcement Learning
 ![task_3.gif](Images%2Ftask_3.gif)
