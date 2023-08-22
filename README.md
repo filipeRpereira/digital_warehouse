@@ -103,13 +103,11 @@ initial results.
 ### Task 1
 The first task is to place a cube on top of another cube.
 Here is possible see the first teste, without any optimization.
-![task_1_fase_0.gif](Images%2Ftask_1_fase_0.gif)
-
-
-
-![task_1_fase_2.gif](Images%2Ftask_1_fase_2.gif)
+![task_1.gif](Images%2Ftask_1.gif)
 
 
 ### Task 2
+![task_2.gif](Images%2Ftask_2.gif)
 
-
+### Task 3
+![task_3.gif](Images%2Ftask_3.gif)
