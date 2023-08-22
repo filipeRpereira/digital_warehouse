@@ -101,8 +101,7 @@ initial results.
 
 ## Tasks Results
 ### Task 1
-The first task is to place a cube on top of another cube.
-Here is possible see the first teste, without any optimization.
+
 ![task_1.gif](Images%2Ftask_1.gif)
 
 
