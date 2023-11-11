@@ -141,14 +141,14 @@ def plot_effort_sim(_effort_array_0, _effort_array_1, _effort_array_2,
     plt.ylabel("Torque (Nm)")
 
     plt.plot(_timestamp_array_0, _effort_array_0[joint_num])
-    plt.plot(_timestamp_array_1, _effort_array_1[joint_num])
-    #plt.plot(_timestamp_array_2, _effort_array_2[joint_num])
+    #plt.plot(_timestamp_array_1, _effort_array_1[joint_num])
+    plt.plot(_timestamp_array_2, _effort_array_2[joint_num])
 
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    #plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
-    plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
+    plt.legend(["RL", "RL optimized to prevent drag"], loc="lower right")
+    #plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
 
     plt.show()
 
@@ -160,14 +160,14 @@ def plot_angular_acc(_angular_acc_array_0, _angular_acc_array_1, _angular_acc_ar
     plt.ylabel("Angular Acceleration (rad/s²)")
 
     plt.plot(_timestamp_array_0, _angular_acc_array_0[joint_num])
-    plt.plot(_timestamp_array_1, _angular_acc_array_1[joint_num])
-    #plt.plot(_timestamp_array_2, _angular_acc_array_2[joint_num])
+    #plt.plot(_timestamp_array_1, _angular_acc_array_1[joint_num])
+    plt.plot(_timestamp_array_2, _angular_acc_array_2[joint_num])
 
     plt.xticks(np.linspace(0.0, _timestamp_array_0[-1], num=10))
     plt.xticks(rotation=90)
 
-    #plt.legend(["Manual Programming", "RL with optimization", "RL with optimization (drag)"], loc="lower right")
-    plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
+    plt.legend(["RL", "RL optimized to prevent drag"], loc="lower right")
+    #plt.legend(["Manual Programming", "RL with optimization"], loc="lower right")
 
     plt.show()
 
@@ -234,11 +234,11 @@ if __name__ == '__main__':
     # Define and parse input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--task_name_0', help='Save data from ROS topics.',
-                        required=False, default="phase_0_27")
+                        required=False, default="phase_2_27")
     parser.add_argument('--task_name_1', help='Save data from ROS topics.',
-                        required=False, default="phase_2_27")
+                        required=False, default="task_1_5s_27_agent")
     parser.add_argument('--task_name_2', help='Save data from ROS topics.',
-                        required=False, default="phase_2_27")
+                        required=False, default="task_1_best_result_27")
     parser.add_argument('--read_data', help='Read data from json file.',
                         required=False, default=False)
     parser.add_argument('--plot_acc', help='Plot the angular acceleration of each individual joint.',
@@ -264,7 +264,8 @@ if __name__ == '__main__':
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
 
-        valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        #valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        valid_frames_0 = get_valid_frames(jsonData_0)
         effort_joint_0 = total_effort_per_joint(jsonData_0, valid_frames_0)
 
         valid_frames_1 = get_valid_frames(jsonData_1)
@@ -291,12 +292,14 @@ if __name__ == '__main__':
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
 
-        valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        #valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        valid_frames_0 = get_valid_frames(jsonData_0)
         valid_frames_1 = get_valid_frames(jsonData_1)
         valid_frames_2 = get_valid_frames(jsonData_2)
 
         angular_acc_array_0 = get_angular_acc_array(jsonData_0, valid_frames_0)
-        timestamp_array_0 = get_valid_timestamp_frame_sim(jsonData_0, valid_frames_0)
+        #timestamp_array_0 = get_valid_timestamp_frame_sim(jsonData_0, valid_frames_0)
+        timestamp_array_0 = get_valid_timestamp_frame(jsonData_0, valid_frames_0)
 
         angular_acc_array_1 = get_angular_acc_array(jsonData_1, valid_frames_1)
         timestamp_array_1 = get_valid_timestamp_frame(jsonData_1, valid_frames_1)
@@ -313,7 +316,8 @@ if __name__ == '__main__':
         jsonData_1 = read_json_data(json_file_1)
         jsonData_2 = read_json_data(json_file_2)
 
-        valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        #valid_frames_0 = get_valid_frames_sim(jsonData_0)
+        valid_frames_0 = get_valid_frames(jsonData_0)
         valid_frames_1 = get_valid_frames(jsonData_1)
         valid_frames_2 = get_valid_frames(jsonData_2)
 
@@ -321,7 +325,8 @@ if __name__ == '__main__':
         effort_array_1 = get_effort_array(jsonData_1, valid_frames_1)
         effort_array_2 = get_effort_array(jsonData_2, valid_frames_2)
 
-        timestamp_array_0 = get_valid_timestamp_frame_sim(jsonData_0, valid_frames_0)
+        #timestamp_array_0 = get_valid_timestamp_frame_sim(jsonData_0, valid_frames_0)
+        timestamp_array_0 = get_valid_timestamp_frame(jsonData_0, valid_frames_0)
         timestamp_array_1 = get_valid_timestamp_frame(jsonData_1, valid_frames_1)
         timestamp_array_2 = get_valid_timestamp_frame(jsonData_2, valid_frames_2)
 
